@@ -1,0 +1,13 @@
+{
+  "name": "jsp-skills",
+  "owner": {
+    "name": "Bracken Spencer"
+  },
+  "plugins": [
+    {
+      "name": "jsp-skills",
+      "source": "./jsp-skills",
+      "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment."
+    }
+  ]
+}
