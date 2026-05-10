@@ -1,7 +1,7 @@
 ---
 name: tier2-sync
 description: Tier 2 sync workflow that activates on "fork updates", "sync fork", "pull from fork", "tier 2 updates", or /jsp-skills:sync. Directs to /jsp-skills:sync for automated workflow.
-allowed-tools: Bash
+allowed-tools: Bash(git branch:*)
 user-invocable: false
 ---
 

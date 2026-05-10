@@ -1,7 +1,7 @@
 {
   "name": "jsp-skills",
   "version": "0.1.0",
-  "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment.",
+  "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, Pay-gem subscriptions, Postgres migrations, and Kamal deployment.",
   "author": {
     "name": "Bracken Spencer",
     "url": "https://github.com/brackendev"

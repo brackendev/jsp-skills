@@ -1,6 +1,6 @@
 {
   "name": "jsp-skills",
-  "description": "Jumpstart Pro Rails toolkit for Claude Code: multi-tenancy, billing, Hotwire, migrations, and deployment",
+  "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, Pay-gem subscriptions, Postgres migrations, and Kamal deployment.",
   "owner": {
     "name": "Bracken Spencer"
   },
@@ -8,7 +8,7 @@
     {
       "name": "jsp-skills",
       "source": "./jsp-skills",
-      "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment."
+      "description": "Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, Pay-gem subscriptions, Postgres migrations, and Kamal deployment."
     }
   ]
 }
