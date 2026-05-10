@@ -1,7 +1,7 @@
 ---
 name: sync
 description: Pull Tier 2 updates into jsp-fork-master, merge to working branch, and create PR
-allowed-tools: Bash(git checkout:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(date:*)
+allowed-tools: Bash(git checkout:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(date:*), SlashCommand(/jsp-skills:ship)
 user-invocable: true
 disable-model-invocation: true
 ---
