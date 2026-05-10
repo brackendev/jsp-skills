@@ -1,0 +1,8 @@
+interface:
+  display_name: "Troubleshooting"
+  short_description: "Development environment diagnostics."
+  default_prompt: "Use troubleshooting to diagnose this issue."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,16 @@
+name: jsp-skills
+version: 0.1.0
+description: Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment, deployed to every runtime APM supports.
+author: Bracken Spencer
+license: MIT
+target: all
+type: skill
+dependencies:
+  apm: []
+  mcp: []
+devDependencies:
+  apm: []
+compilation:
+  target: all
+  strategy: distributed
+  source_attribution: true

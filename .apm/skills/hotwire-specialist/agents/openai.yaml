@@ -1,0 +1,8 @@
+interface:
+  display_name: "Hotwire Specialist"
+  short_description: "Hotwire (Turbo + Stimulus) frontend work."
+  default_prompt: "Use hotwire-specialist for Turbo and Stimulus."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

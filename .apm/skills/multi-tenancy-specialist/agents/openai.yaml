@@ -1,0 +1,8 @@
+interface:
+  display_name: "Multi-Tenancy Specialist"
+  short_description: "Account scoping and tenant isolation."
+  default_prompt: "Use multi-tenancy-specialist for tenant work."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,8 @@
+interface:
+  display_name: "Tier 2 Sync"
+  short_description: "Tier 2 sync workflow guidance."
+  default_prompt: "Use tier2-sync to plan a fork sync."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

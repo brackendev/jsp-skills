@@ -1,0 +1,8 @@
+interface:
+  display_name: "Account Scoping"
+  short_description: "Multi-tenancy checklist for new Rails resources."
+  default_prompt: "Use account-scoping to review tenant isolation."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

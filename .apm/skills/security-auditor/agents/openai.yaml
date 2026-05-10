@@ -1,0 +1,8 @@
+interface:
+  display_name: "Security Auditor"
+  short_description: "Comprehensive security audits."
+  default_prompt: "Use security-auditor for a security review."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

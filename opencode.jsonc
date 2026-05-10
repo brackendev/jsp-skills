@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "skill": {
+      "account-scoping": "allow",
+      "api-specialist": "allow",
+      "billing-specialist": "allow",
+      "database-specialist": "allow",
+      "deploy-check": "allow",
+      "deployment-specialist": "allow",
+      "hotwire-specialist": "allow",
+      "migration-safety": "allow",
+      "multi-tenancy-specialist": "allow",
+      "security-auditor": "allow",
+      "ship": "allow",
+      "sync": "allow",
+      "tier2-sync": "allow",
+      "troubleshooting": "allow"
+    }
+  }
+}

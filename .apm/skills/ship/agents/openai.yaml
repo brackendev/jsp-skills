@@ -1,0 +1,8 @@
+interface:
+  display_name: "Ship"
+  short_description: "Branch, commit, push, create PR, label."
+  default_prompt: "Use ship to deliver this feature."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: false

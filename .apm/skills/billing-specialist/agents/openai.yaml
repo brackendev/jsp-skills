@@ -1,0 +1,8 @@
+interface:
+  display_name: "Billing Specialist"
+  short_description: "Subscription billing with Pay gem."
+  default_prompt: "Use billing-specialist for subscription work."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

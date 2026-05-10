@@ -1,0 +1,8 @@
+interface:
+  display_name: "Migration Safety"
+  short_description: "Reviews migrations for zero-downtime patterns."
+  default_prompt: "Use migration-safety to review this migration."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true

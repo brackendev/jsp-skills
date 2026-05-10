@@ -1,0 +1,8 @@
+interface:
+  display_name: "Sync"
+  short_description: "Pull Tier 2 updates and create a merge PR."
+  default_prompt: "Use sync to pull Tier 2 updates."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: false

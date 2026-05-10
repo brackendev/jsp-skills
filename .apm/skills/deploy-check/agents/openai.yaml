@@ -1,0 +1,8 @@
+interface:
+  display_name: "Deploy Check"
+  short_description: "Pre-deployment verification checklist."
+  default_prompt: "Run deploy-check before production release."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: false

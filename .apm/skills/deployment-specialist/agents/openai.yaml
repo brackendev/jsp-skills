@@ -1,0 +1,8 @@
+interface:
+  display_name: "Deployment Specialist"
+  short_description: "Kamal deployments and production operations."
+  default_prompt: "Use deployment-specialist for production deploys."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: true
