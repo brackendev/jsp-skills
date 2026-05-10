@@ -7,5 +7,6 @@
     "url": "https://github.com/brackendev"
   },
   "repository": "https://github.com/brackendev/jsp-skills",
+  "license": "MIT",
   "keywords": ["jumpstart-pro", "rails", "skills", "hotwire", "multi-tenancy", "docker", "make"]
 }
