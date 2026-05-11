@@ -10,7 +10,7 @@ Project scope (writes into the consumer project):
 
 ```bash
 cd /absolute/path/to/your-project
-apm install brackendev/jsp-skills --target claude,codex,opencode,cursor,copilot,gemini,windsurf
+apm install brackendev/jsp-skills --target all
 ```
 
 User scope (writes under `~/`):
@@ -19,7 +19,7 @@ User scope (writes under `~/`):
 apm install brackendev/jsp-skills -g --target all
 ```
 
-Update with `apm install --update [-g]`. Remove with `apm uninstall brackendev/jsp-skills [-g]`. A local filesystem path can replace the shorthand at either scope.
+Refresh dependencies with `apm update [-g]`. Remove with `apm uninstall brackendev/jsp-skills [-g]`. A local filesystem path can replace the shorthand at either scope.
 
 See [WORKFLOWS.md](WORKFLOWS.md) for real-world skill sequences.
 
