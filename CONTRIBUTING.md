@@ -41,6 +41,6 @@ python3 -c "import yaml, pathlib; [yaml.safe_load(p.read_text()) for p in pathli
 
 Local CLIs needed: `apm`, plus any runtime CLI you want to verify (`claude`, `codex`, `copilot`, `gemini`, `opencode`).
 
-- `apm install`, `apm update`, `apm uninstall` in a clean temp project with the runtime root directories pre-created: `.agents/`, `.claude/`, `.cursor/`, `.opencode/`, `.gemini/`, `.github/`, `.windsurf/`. The legacy `apm install --update` form still works but prints a deprecation notice.
+- `apm install`, `apm update`, `apm uninstall` in a clean temp project with the runtime root directories pre-created: `.agents/`, `.claude/`, `.cursor/`, `.opencode/`, `.gemini/`, `.github/`, `.windsurf/`.
 - `apm install brackendev/jsp-skills -g [--target ...]` and `apm uninstall brackendev/jsp-skills -g` to exercise user-scope install. Local-path form (`apm install /absolute/path -g`) is also accepted.
 - OpenCode: `opencode --pure debug skill` lists the deployed skills and their source paths.
