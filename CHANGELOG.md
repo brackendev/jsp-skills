@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-05-14
+
+### Changed
+
+- The `sync` skill aligns with the upstream Jumpstart Pro Rails restructure of December 12, 2025. Upstream-owned framework source now lives under `lib/jumpstart/app/`, and the project's `app/` directory is the dedicated override layer. The path policy table adds a row for `lib/jumpstart/app/` and clarifies that upstream no longer adds files under `app/`. The dead "re-apply upstream additions under `app/`" block at the end of the project-owned policy step is removed.
+- The `sync` skill adds a drift-detection step that runs after the divergence report is generated. The step inventories every project override under `app/` whose path mirrors a file under `lib/jumpstart/app/`, diffs each override against the post-merge upstream source, and appends a `### Project overrides with drift from upstream source` section to the sync audit report when drift is found.
+- The `sync` skill documents a structural-first-then-reconcile cadence for handling deferred upstream improvements after the sync. Phase A creates overrides under `app/` and reverts engine-owned files in `lib/jumpstart/app/` to upstream HEAD as a single structural PR. Phase B reconciles override content against upstream improvements, one PR per area.
+
 ## [0.1.3] - 2026-05-14
 
 ### Changed

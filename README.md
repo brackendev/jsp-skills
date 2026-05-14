@@ -58,7 +58,8 @@ Path policy:
 
 | Path | Treatment |
 |------|-----------|
-| `app/` | Project owns; new upstream files under `app/` flow in |
+| `app/` | Project owns. Upstream should not add files here; framework additions belong under `lib/jumpstart/app/`. |
+| `lib/jumpstart/app/` | Upstream owns. Framework engine overrides flow in through the divergence audit. Project edits here are drift and should move to overrides under `app/`. |
 | `test/` (including `test/seeds/`) | Project owns |
 | `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
 | `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |

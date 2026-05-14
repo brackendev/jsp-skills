@@ -90,15 +90,6 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 
     `test/seeds/` is restored as part of `test/`. `config/jumpstart.yml` is resolved in step 13.
 
-    Re-apply upstream additions under `app/` so new files (for example, new engine overrides) flow in:
-
-    ```bash
-    git diff --name-only --diff-filter=A HEAD...jumpstart-pro/main -- app/ \
-      | xargs -I{} git checkout jumpstart-pro/main -- {} 2>/dev/null
-    git diff --name-only --diff-filter=A HEAD...jumpstart-pro/main -- app/ \
-      | xargs -I{} git add {} 2>/dev/null
-    ```
-
 13. **Resolve remaining conflicts**:
 
     Run `git diff --name-only --diff-filter=U` to list any files still in conflict (the wholesale-restore in step 12 resolved most project-owned paths). Handle remaining conflicts by category:
@@ -162,13 +153,40 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 
       Add: "Adopt selectively in a follow-up if desired."
 
-17. **Complete the merge**:
+17. **Detect drift between project overrides and upstream sources**:
+
+    Project overrides under `app/` can drift from their upstream sources under `lib/jumpstart/app/` between syncs. When upstream changes a file the project has overridden, the override silently misses the upstream improvement unless someone checks. This step surfaces that drift so reviewers see the affected overrides in the sync report.
+
+    Find every project override whose path mirrors a file under `lib/jumpstart/app/`, then diff each override against the post-merge upstream source:
+
+    ```bash
+    comm -12 \
+      <(cd app && find . -type f | sed 's|^\./||' | sort) \
+      <(cd lib/jumpstart/app && find . -type f | sed 's|^\./||' | sort) \
+      > /tmp/jsp-sync-override-inventory.txt
+
+    : > /tmp/jsp-sync-override-drift.txt
+    while read -r path; do
+      [ -z "$path" ] && continue
+      if ! diff -q "app/$path" "lib/jumpstart/app/$path" >/dev/null 2>&1; then
+        echo "$path" >> /tmp/jsp-sync-override-drift.txt
+      fi
+    done < /tmp/jsp-sync-override-inventory.txt
+    ```
+
+    Append a new section to `/tmp/jsp-sync-report.md`:
+
+    - `### Project overrides with drift from upstream source` — contents of `/tmp/jsp-sync-override-drift.txt`. List the first 30 paths and add "and N more" if longer. Add: "Each listed override differs from its upstream source under `lib/jumpstart/app/`. Review whether upstream's improvements should be adopted into the override; the structural-first-then-reconcile cadence described below handles this as follow-up work after the sync PR merges."
+
+    If `/tmp/jsp-sync-override-drift.txt` is empty, omit the section.
+
+18. **Complete the merge**:
     - Run `git commit` to finalize the merge commit.
 
-18. **Push the working branch**:
+19. **Push the working branch**:
     - Run `git push -u origin HEAD`.
 
-19. **Hand off to the user**:
+20. **Hand off to the user**:
     - Report that the working branch has been pushed to `origin` and that the divergence audit is saved at `/tmp/jsp-sync-report.md`.
     - Instruct the user to open the PR with their own preferred workflow and to include the contents of `/tmp/jsp-sync-report.md` under a `## Sync audit` section in the PR body.
     - Stop. Intermediate scratch files matching `/tmp/jsp-sync-*` are cleaned up at the start of the next sync run by step 1.
@@ -177,7 +195,8 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 
 | Path | Treatment |
 |------|-----------|
-| `app/` | Project owns; new upstream files under `app/` are re-applied so framework engine overrides flow in |
+| `app/` | Project owns. Upstream should not add files here; upstream framework additions belong under `lib/jumpstart/app/`. |
+| `lib/jumpstart/app/` | Upstream owns. Framework engine overrides flow in through the divergence audit. Project edits here are drift and should move to overrides under `app/`. |
 | `test/` (including `test/seeds/`) | Project owns |
 | `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
 | `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
@@ -188,6 +207,14 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 | `.cursor/`, `UPGRADE.md` | Upstream-only; `UPGRADE.md` is displayed during sync, then both are removed from the worktree before commit |
 | `config/database.yml`, `package.json` | Manual review during conflict resolution |
 | Rails substrate (`config/` other than above, `db/`, `lib/`, `bin/`, root dotfiles, `Rakefile`, anything else) | Divergence audit: project changes preserved, upstream changes applied, both-changed paths reported for review |
+
+**Handling deferred upstream improvements after the sync:**
+
+When the sync surfaces both-changed paths under `lib/jumpstart/app/` and the project's edits are kept, or when the drift-detection step (step 17) reports overrides that have fallen behind upstream, address the deferred upstream changes in two follow-up phases.
+
+Phase A (structural). For each affected path, create an override under `app/` at the matching relative path, then revert the engine-owned file in `lib/jumpstart/app/` to upstream HEAD. The in-engine generator handles the override scaffolding: `bin/rails generate jumpstart:override <app-path>`. This is a runtime no-op because `config.railties_order = [:main_app, Jumpstart::Engine, :all]` resolves the override ahead of the engine copy. Phase A lands as a single PR (or a small PR group when the change set is large), so the structural move is reviewed independently of any content changes.
+
+Phase B (reconciliation). Per area (for example, `application/*`, `devise/*`, `notifications/*`), compare each override against the corresponding upstream source under `lib/jumpstart/app/` and adopt upstream's improvements where they don't conflict with project customizations. Translation key renames require matching updates to `config/locales/en.yml`. Phase B is one PR per area so each reconciliation is reviewable on its own.
 
 **Example usage:**
 ```bash
