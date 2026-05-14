@@ -1,7 +1,7 @@
 ---
 name: sync
-description: Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and open a PR, preserving project customizations through a merge-base divergence audit
-allowed-tools: Bash(git checkout:*), Bash(git fetch:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(git remote:*), Bash(git symbolic-ref:*), Bash(date:*), Bash(comm:*), Bash(sort:*), Bash(diff:*), Bash(grep:*), Bash(sed:*), Bash(wc:*), Bash(cat:*), Bash(rm:*), Read, AskUserQuestion, SlashCommand(/jsp-skills:ship)
+description: Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and push it for review, preserving project customizations through a merge-base divergence audit
+allowed-tools: Bash(git checkout:*), Bash(git fetch:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(git remote:*), Bash(git symbolic-ref:*), Bash(date:*), Bash(comm:*), Bash(sort:*), Bash(diff:*), Bash(grep:*), Bash(sed:*), Bash(wc:*), Bash(cat:*), Bash(rm:*), Read, AskUserQuestion
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -168,11 +168,10 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 18. **Push the working branch**:
     - Run `git push -u origin HEAD`.
 
-19. **Create the PR using /jsp-skills:ship**:
-    - Execute `/jsp-skills:ship`. When `/tmp/jsp-sync-report.md` exists, `/jsp-skills:ship` includes its contents in the PR body under a "Sync audit" section.
-
-20. **Clean up temporary files**:
-    - After `/jsp-skills:ship` returns, remove the sync hand-off and intermediate files: `rm -f /tmp/jsp-sync-*`.
+19. **Hand off to the user**:
+    - Report that the working branch has been pushed to `origin` and that the divergence audit is saved at `/tmp/jsp-sync-report.md`.
+    - Instruct the user to open the PR with their own preferred workflow and to include the contents of `/tmp/jsp-sync-report.md` under a `## Sync audit` section in the PR body.
+    - Stop. Intermediate scratch files matching `/tmp/jsp-sync-*` are cleaned up at the start of the next sync run by step 1.
 
 **Path policy:**
 

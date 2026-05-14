@@ -12,7 +12,6 @@
       "migration-safety": "allow",
       "multi-tenancy-specialist": "allow",
       "security-auditor": "allow",
-      "ship": "allow",
       "sync": "allow",
       "troubleshooting": "allow"
     }

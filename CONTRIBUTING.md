@@ -9,7 +9,6 @@ This file is for people working on the plugin source. End-user install instructi
 - `.opencode/skills/`: `SKILL.md` mirror of `.apm/skills/`. Used for local OpenCode validation (`opencode --pure debug skill`). Only `SKILL.md` is mirrored; supporting files under `.apm/skills/<name>/agents/` are not duplicated.
 - `opencode.jsonc`, `.opencode/package.json`: local OpenCode configuration files.
 - `README.md`: end-user documentation.
-- `WORKFLOWS.md`: real-world skill sequences.
 - `CHANGELOG.md`: user-facing changes per version.
 - `CLAUDE.md`: local working notes (gitignored globally).
 - `TODO.md`: open follow-up items (gitignored globally).

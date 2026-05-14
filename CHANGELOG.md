@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-14
+
+### Changed
+
+- The `sync` skill stops after pushing the working branch instead of opening a PR. The divergence audit is saved to `/tmp/jsp-sync-report.md`. The user opens the PR with their own preferred workflow and includes the report contents under a `## Sync audit` section in the PR body.
+
+### Removed
+
+- The `ship` skill. Project conventions for branch naming, PR template, screenshot capture, and labeling are no longer part of this plugin. Users open PRs with their own preferred workflow.
+
 ## [0.1.2] - 2026-05-14
 
 ### Changed

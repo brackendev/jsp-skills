@@ -21,8 +21,6 @@ apm install brackendev/jsp-skills -g --target all
 
 Refresh dependencies with `apm update [-g]`. Remove with `apm uninstall brackendev/jsp-skills [-g]`. A local filesystem path can replace the shorthand at either scope.
 
-See [WORKFLOWS.md](WORKFLOWS.md) for real-world skill sequences.
-
 ## Skills
 
 All skills follow the [Agent Skills](https://agentskills.io) open standard. Skill source lives under `.apm/skills/<name>/SKILL.md`, with a `SKILL.md` mirror under `.opencode/skills/<name>/` for local OpenCode validation.
@@ -39,19 +37,9 @@ Pre-deployment verification checklist before production release.
 /jsp-skills:deploy-check
 ```
 
-#### `ship [issue-number] [pr-title]`
-
-Branch, commit, push, create PR, and label in one workflow.
-
-```bash
-/jsp-skills:ship 161 Add SSL troubleshooting guide   # with issue and title
-/jsp-skills:ship 161                                 # with issue (generates title)
-/jsp-skills:ship                                     # generates everything
-```
-
 #### `sync`
 
-Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and open a PR. The project repository must have the JSP repository configured as a Git remote named `jumpstart-pro`.
+Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and push it for review. The project repository must have the JSP repository configured as a Git remote named `jumpstart-pro`.
 
 ```bash
 /jsp-skills:sync
@@ -64,7 +52,7 @@ The skill's first priority is that project customizations are never silently ove
 - Computes the merge base between the project and `jumpstart-pro/main`, then classifies every changed path as project-only, upstream-only, or both-changed. The both-changed list is shown before the merge so the maintainer knows which files Git will auto-merge.
 - Applies a project-owned policy that wholesale-restores explicit paths to the project version after the merge.
 - Verifies a no-clobber invariant before commit: every project-only path must be byte-identical to the project's `HEAD`. If any project-only path was modified, the merge aborts.
-- Writes a markdown sync-audit report that `/jsp-skills:ship` embeds in the PR description.
+- Writes a markdown sync-audit report to `/tmp/jsp-sync-report.md` and stops after pushing the working branch. The user opens the PR with their own preferred workflow and includes the report under a `## Sync audit` section in the PR body.
 
 Path policy:
 
