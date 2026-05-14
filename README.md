@@ -72,7 +72,7 @@ Path policy:
 |------|-----------|
 | `app/` | Project owns; new upstream files under `app/` flow in |
 | `test/` (including `test/seeds/`) | Project owns |
-| `README.md`, `CLAUDE.md`, `.claude/` | Project owns |
+| `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
 | `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
 | `docs/`, `templates/` | Project owns |
 | `config/jumpstart.yml` | Project owns |

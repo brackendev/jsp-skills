@@ -61,7 +61,7 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
    Filter the both-changed list to the paths that will actually need review (excluding paths the project-owned policy will overwrite back to the project version):
 
    ```bash
-   grep -Ev '^(app/|test/|README\.md$|CLAUDE\.md$|\.claude/|\.cursor/|Makefile$|compose\.yaml$|Dockerfile\.dev$|\.github/|docs/|templates/|UPGRADE\.md$|Gemfile$|Gemfile\.lock$|config/jumpstart\.yml$)' /tmp/jsp-sync-both-changed.txt > /tmp/jsp-sync-both-changed-needs-review.txt || true
+   grep -Ev '^(app/|test/|README\.md$|CLAUDE\.md$|AGENTS\.md$|\.claude/|\.cursor/|Makefile$|compose\.yaml$|Dockerfile\.dev$|\.github/|docs/|templates/|UPGRADE\.md$|Gemfile$|Gemfile\.lock$|config/jumpstart\.yml$)' /tmp/jsp-sync-both-changed.txt > /tmp/jsp-sync-both-changed-needs-review.txt || true
    ```
 
 9. **Create a timestamped working branch**:
@@ -83,8 +83,9 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 
     ```bash
     git restore --source=HEAD --staged --worktree -- \
-      app/ test/ README.md CLAUDE.md .claude/ .cursor/ Makefile compose.yaml \
-      Dockerfile.dev .github/ docs/ templates/ UPGRADE.md Gemfile Gemfile.lock
+      app/ test/ README.md CLAUDE.md AGENTS.md .claude/ .cursor/ Makefile \
+      compose.yaml Dockerfile.dev .github/ docs/ templates/ UPGRADE.md \
+      Gemfile Gemfile.lock
     ```
 
     `test/seeds/` is restored as part of `test/`. `config/jumpstart.yml` is resolved in step 13.
@@ -151,12 +152,12 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
     - `### Project changes preserved` — count of paths in `/tmp/jsp-sync-project-only.txt`. Confirm the no-clobber invariant held.
     - `### Both-changed paths requiring review` — contents of `/tmp/jsp-sync-both-changed-needs-review.txt`. Add: "Git auto-merged or the conflicts were resolved manually. Review each path before approving the PR."
     - `### Both-changed paths covered by project-owned policy` — contents of `/tmp/jsp-sync-both-changed.txt` minus the "needs review" subset. Add: "These paths were restored to the project version by the project-owned policy; no review required."
-    - `### Upstream additions not applied to project-owned paths` — new files upstream added under `CLAUDE.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml`. Compute with:
+    - `### Upstream additions not applied to project-owned paths` — new files upstream added under `CLAUDE.md AGENTS.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml`. Compute with:
 
       ```bash
       git diff --name-only --diff-filter=A "$MERGE_BASE"...jumpstart-pro/main -- \
-        CLAUDE.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ \
-        docs/ templates/ test/seeds/ README.md config/jumpstart.yml
+        CLAUDE.md AGENTS.md .claude/ Makefile compose.yaml Dockerfile.dev \
+        .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml
       ```
 
       Add: "Adopt selectively in a follow-up if desired."
@@ -179,7 +180,7 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 |------|-----------|
 | `app/` | Project owns; new upstream files under `app/` are re-applied so framework engine overrides flow in |
 | `test/` (including `test/seeds/`) | Project owns |
-| `README.md`, `CLAUDE.md`, `.claude/` | Project owns |
+| `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
 | `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
 | `docs/`, `templates/` | Project owns |
 | `config/jumpstart.yml` | Project owns |

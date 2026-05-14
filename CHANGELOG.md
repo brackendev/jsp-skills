@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-05-14
+
+### Changed
+
+- The `sync` skill treats `AGENTS.md` the same as `CLAUDE.md`: project-owned, wholesale-restored to the project version after the merge, and surfaced in the upstream-additions section of the PR body when upstream introduces a new `AGENTS.md`.
+
 ## [0.1.1] - 2026-05-14
 
 ### Changed
