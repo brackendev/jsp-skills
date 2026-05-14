@@ -420,11 +420,11 @@ For complex migrations, the `database-specialist` skill activates automatically 
 **Jumpstart Pro migrations:**
 Check existing migrations in `db/migrate/` for patterns
 
-**Multi-database config:**
-https://github.com/brackendev/jumpstart-pro-fork/blob/master/config/database.yml
+**Multi-database configuration:**
+See `config/database.yml` in the JSP upstream
 
 **Migration patterns:**
-https://github.com/brackendev/jumpstart-pro-fork/blob/master/CLAUDE.md#architecture
+See the architecture section of the JSP upstream `CLAUDE.md`
 
 **Rails migration guides:**
 https://guides.rubyonrails.org/active_record_migrations.html

@@ -51,20 +51,36 @@ Branch, commit, push, create PR, and label in one workflow.
 
 #### `sync`
 
-Pull Tier 2 updates into `jsp-fork-master`, merge to working branch, and create a PR.
+Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and open a PR. The project repository must have the JSP repository configured as a Git remote named `jumpstart-pro`.
 
 ```bash
 /jsp-skills:sync
 ```
 
-Conflict strategy:
+The skill's first priority is that project customizations are never silently overwritten. To deliver that guarantee it:
 
-| Category | Strategy |
-|----------|----------|
-| App code (`app/`, `test/`) | Keep Tier 3 |
-| Infrastructure (`Makefile`, `Dockerfile`, `compose.yaml`) | Accept Tier 2 |
-| `Gemfile` | Tier 2 base + Tier 3 gems |
-| `config/database.yml`, `package.json` | Manual review |
+- Detects the project's primary branch and refuses to run with a dirty working tree.
+- Displays the upstream `UPGRADE.md` before merging so the maintainer reviews upgrade notes first.
+- Computes the merge base between the project and `jumpstart-pro/main`, then classifies every changed path as project-only, upstream-only, or both-changed. The both-changed list is shown before the merge so the maintainer knows which files Git will auto-merge.
+- Applies a project-owned policy that wholesale-restores explicit paths to the project version after the merge.
+- Verifies a no-clobber invariant before commit: every project-only path must be byte-identical to the project's `HEAD`. If any project-only path was modified, the merge aborts.
+- Writes a markdown sync-audit report that `/jsp-skills:ship` embeds in the PR description.
+
+Path policy:
+
+| Path | Treatment |
+|------|-----------|
+| `app/` | Project owns; new upstream files under `app/` flow in |
+| `test/` (including `test/seeds/`) | Project owns |
+| `README.md`, `CLAUDE.md`, `.claude/` | Project owns |
+| `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
+| `docs/`, `templates/` | Project owns |
+| `config/jumpstart.yml` | Project owns |
+| `Gemfile` | Project version kept; upstream gem changes surfaced for opt-in |
+| `Gemfile.lock` | Project version kept; regenerate with `bundle lock` after the merge commit |
+| `.cursor/`, `UPGRADE.md` | Upstream-only; `UPGRADE.md` is displayed during sync, neither is copied into the project |
+| `config/database.yml`, `package.json` | Manual review during conflict resolution |
+| Rails substrate (`config/` other than above, `db/`, `lib/`, `bin/`, root dotfiles, `Rakefile`, anything else) | Divergence audit: project changes preserved, upstream changes applied, both-changed paths reported for review |
 
 ### Auto-Triggered
 
@@ -75,7 +91,6 @@ These skills activate automatically based on conversation context.
 | `account-scoping` | "create model", "new controller", "add resource", "scaffold", "rails g model", "rails g controller", "rails g resource", "rails g scaffold", "generate model", "build controller", "background job" |
 | `migration-safety` | "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", "database migration" |
 | `troubleshooting` | "Docker error", "container won't start", "SSL certificate", "make setup failed", "port already in use", "permission denied", "can't connect to database" |
-| `tier2-sync` | "fork updates", "sync fork", "pull from fork", "tier 2 updates" |
 
 ### Specialists
 

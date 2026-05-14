@@ -95,13 +95,12 @@ Real-world skill sequences for Jumpstart Pro Rails development.
 
 ---
 
-## Tier 2 Sync
+## Upstream Sync
 
-Pull infrastructure updates:
+Pull JSP upstream updates:
 
 ```bash
-/jsp-skills:sync                         # pull Tier 2 updates, merge, create PR
-# ... tier2-sync skill guides conflicts ...
+/jsp-skills:sync                         # pull JSP upstream, merge, create PR
 /project-skills:check                    # run and fix format, lint, test, build
 ```
 

@@ -2,7 +2,7 @@
 name: ship
 description: Branch, commit, push, create PR, and label in one workflow
 argument-hint: "[issue-number] [pr-title]"
-allowed-tools: Bash(make lint-fix:*), Bash(make test-all:*), Bash(make up:*), Bash(make ps:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git checkout:*), Bash(git push:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh label list:*), mcp__playwright__browser_navigate, mcp__playwright__browser_screenshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_close, AskUserQuestion
+allowed-tools: Bash(make lint-fix:*), Bash(make test-all:*), Bash(make up:*), Bash(make ps:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*), Bash(git diff:*), Bash(git log:*), Bash(git branch:*), Bash(git checkout:*), Bash(git push:*), Bash(gh pr create:*), Bash(gh pr edit:*), Bash(gh label list:*), Bash(rm:*), Read, mcp__playwright__browser_navigate, mcp__playwright__browser_screenshot, mcp__playwright__browser_click, mcp__playwright__browser_type, mcp__playwright__browser_close, AskUserQuestion
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -106,6 +106,9 @@ Complete feature workflow from branch creation to PR with labels:
 ## Motivation and Context
 [Auto-generated: Infer from commit messages and changes]
 
+## Sync audit
+[Read `/tmp/jsp-sync-report.md` if it exists. If the file is present and non-empty, embed its contents under this heading. If the file is missing or empty, omit this entire section.]
+
 ## Screenshots
 [Auto-detect NEW screenshots added in this PR by checking `git diff origin/master...HEAD --name-only` for files in `screenshots/{branch-name}/`]
 [If new screenshots found, include them below with descriptive section headers and names inferred from route/filename]
@@ -129,6 +132,7 @@ Complete feature workflow from branch creation to PR with labels:
 ```
 
    - Create with `gh pr create --title "..." --body "..."` using HEREDOC
+   - After PR creation succeeds, remove the sync hand-off file if it was present: `rm -f /tmp/jsp-sync-report.md`.
 
 8. **Add labels**:
    - Run `gh label list` to see available labels

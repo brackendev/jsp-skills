@@ -380,9 +380,6 @@ For complex multi-tenancy patterns, the `multi-tenancy-specialist` skill activat
 **Jumpstart Pro multi-tenancy docs:**
 https://jumpstartrails.com/docs/accounts
 
-**Tier 2 architecture section:**
-https://github.com/brackendev/jumpstart-pro-fork/blob/master/CLAUDE.md#architecture
-
 **Key Jumpstart Pro patterns:**
 - AccountRecord: `app/models/account_record.rb`
 - Current: `app/models/current.rb`

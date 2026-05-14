@@ -408,9 +408,7 @@ This runs a complete integrity check from a clean state.
 
 ## Reference Documentation
 
-For detailed troubleshooting:
-
-**Comprehensive guide:** https://github.com/brackendev/jumpstart-pro-fork/blob/master/docs/shared/TROUBLESHOOTING.md
+For detailed troubleshooting, see `docs/shared/TROUBLESHOOTING.md` in the JSP upstream.
 
 Covers:
 - Docker issues (volume permissions, networking)
@@ -420,9 +418,7 @@ Covers:
 - Asset pipeline errors
 - Development server issues
 
-**Testing guide:** https://github.com/brackendev/jumpstart-pro-fork/blob/master/docs/shared/TESTING.md
-
-**Make commands:** https://github.com/brackendev/jumpstart-pro-fork/blob/master/docs/shared/MAKEFILE.md
+See also `docs/shared/TESTING.md` and `docs/shared/MAKEFILE.md` in the JSP upstream.
 
 ---
 
@@ -455,5 +451,4 @@ git stash pop
 ```
 
 **Search for similar issues:**
-- Tier 2 issues: https://github.com/brackendev/jumpstart-pro-fork/issues
 - Jumpstart Pro docs: https://jumpstartrails.com/docs

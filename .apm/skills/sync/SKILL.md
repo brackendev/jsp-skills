@@ -1,182 +1,200 @@
 ---
 name: sync
-description: Pull Tier 2 updates into jsp-fork-master, merge to working branch, and create PR
-allowed-tools: Bash(git checkout:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(date:*), SlashCommand(/jsp-skills:ship)
+description: Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and open a PR, preserving project customizations through a merge-base divergence audit
+allowed-tools: Bash(git checkout:*), Bash(git fetch:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(git remote:*), Bash(git symbolic-ref:*), Bash(date:*), Bash(comm:*), Bash(sort:*), Bash(diff:*), Bash(grep:*), Bash(sed:*), Bash(wc:*), Bash(cat:*), Bash(rm:*), Read, AskUserQuestion, SlashCommand(/jsp-skills:ship)
 user-invocable: true
 disable-model-invocation: true
 ---
 
-Pull latest changes from Tier 2 and create a PR for merging into master.
+Merge the latest Jumpstart Pro Rails (JSP) upstream changes into a project that started as a clone of the Jumpstart Pro template. The skill's first priority is to never silently overwrite project customizations. Every path that diverges between the project and upstream is classified, every both-changed path is surfaced for review, and project-only changes are verified intact before the merge commit is created.
+
+JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid SaaS Rails template distributed as a Git repository that customers clone, customize, and upgrade by merging from the upstream repository.
+
+**Prerequisites:**
+
+- The project has the Jumpstart Pro Rails repository configured as a Git remote named `jumpstart-pro`. Verify with `git remote -v`. If the remote is missing, add it with `git remote add jumpstart-pro <jsp-repo-url>` before running this skill.
 
 **Arguments:** None
 
 **Steps:**
 
-1. **Verify this is Tier 3**:
-   - Run `git branch --list jumpstartpro-main`
-   - If `jumpstartpro-main` exists: ERROR - This is Tier 2, not Tier 3
-   - The `jumpstartpro-main` branch only exists in Tier 2
-   - Tier 3 has `jsp-fork-master` instead
-   - Stop execution and inform the user this skill is only for Tier 3
+1. **Clean up stale temporary files**:
+   - Remove any leftover sync artifacts from a previous run: `rm -f /tmp/jsp-sync-*`.
 
-2. **Check for uncommitted changes**:
-   - Run `git status --porcelain`
-   - If output is not empty: ERROR - Uncommitted changes detected
-   - Inform user to commit or stash changes before syncing
+2. **Verify the `jumpstart-pro` remote**:
+   - Run `git remote -v`.
+   - If no `jumpstart-pro` remote is listed: ERROR. Ask the user to add the JSP repository as a Git remote named `jumpstart-pro`, then stop.
 
-3. **Switch to jsp-fork-master**:
-   - Run `git checkout jsp-fork-master`
+3. **Detect the project's primary branch**:
+   - Run `git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'`. The output is typically `main` or `master`.
+   - If the command returns empty, use `AskUserQuestion` to ask the user for the primary branch name.
+   - Save the result as `<primary>` for the remaining steps.
 
-4. **Pull latest Tier 2 changes**:
-   - Run `git pull jsp-fork master`
-   - This fetches and merges the latest changes from Tier 2
+4. **Check for uncommitted changes**:
+   - Run `git status --porcelain`.
+   - If output is not empty: ERROR. Ask the user to commit or stash changes before syncing, then stop.
 
-5. **Switch to master**:
-   - Run `git checkout master`
+5. **Fetch the upstream**:
+   - Run `git fetch jumpstart-pro`.
 
-6. **Create timestamped working branch**:
-   - Run `date +%Y%m%d` to get current date
-   - Run `git checkout -b task/pull-tier2-updates-YYYYMMDD`
-   - Example: `git checkout -b task/pull-tier2-updates-20260119`
+6. **Review upstream upgrade notes**:
+   - Check whether upstream maintains an `UPGRADE.md`: `git show jumpstart-pro/main:UPGRADE.md 2>/dev/null`.
+   - If the file exists, display its contents to the user. Upgrade notes typically describe schema migrations, gem version increments, and configuration changes that should be addressed before merging.
+   - Use `AskUserQuestion` to ask whether to continue with the sync or stop and address the upgrade notes first.
+   - If the file does not exist on `jumpstart-pro/main`, skip this step.
 
-7. **Merge jsp-fork-master**:
-   - Run `git merge jsp-fork-master --no-commit` (allows conflict resolution before commit)
-   - Check exit code to detect conflicts
+7. **Update the local primary branch**:
+   - Run `git checkout <primary>`.
+   - Run `git pull --ff-only`.
 
-8. **Protect Tier 3 directories**:
-
-   Restore Tier 3 directories wholesale. This handles deletions, renames, and edits from Tier 2 that would otherwise clobber Tier 3 code:
+8. **Compute the merge base and classify divergence**:
 
    ```bash
-   git restore --source=HEAD --staged --worktree -- app/ test/
+   MERGE_BASE=$(git merge-base HEAD jumpstart-pro/main)
+   git diff --name-only "$MERGE_BASE"...HEAD | sort > /tmp/jsp-sync-project-changes.txt
+   git diff --name-only "$MERGE_BASE"...jumpstart-pro/main | sort > /tmp/jsp-sync-upstream-changes.txt
+   comm -12 /tmp/jsp-sync-project-changes.txt /tmp/jsp-sync-upstream-changes.txt > /tmp/jsp-sync-both-changed.txt
+   comm -23 /tmp/jsp-sync-project-changes.txt /tmp/jsp-sync-upstream-changes.txt > /tmp/jsp-sync-project-only.txt
+   comm -13 /tmp/jsp-sync-project-changes.txt /tmp/jsp-sync-upstream-changes.txt > /tmp/jsp-sync-upstream-only.txt
    ```
 
-   Then restore Tier 2's seed tests (infrastructure, not app code):
-   ```bash
-   git checkout jsp-fork-master -- test/seeds/ 2>/dev/null && git add test/seeds/ 2>/dev/null
-   ```
-
-   Re-apply Tier 2 app-level additions that Tier 3 does not have yet (e.g., new engine overrides). Without this, the wholesale restore above removes new Tier 2 files from `app/`:
-   ```bash
-   git diff --name-only --diff-filter=A HEAD...jsp-fork-master -- app/ | xargs -I{} git checkout jsp-fork-master -- {} 2>/dev/null
-   git diff --name-only --diff-filter=A HEAD...jsp-fork-master -- app/ | xargs -I{} git add {} 2>/dev/null
-   ```
-
-9. **Handle remaining conflicts**:
-
-   Run `git diff --name-only --diff-filter=U` to list conflicted files, then resolve by category:
-
-   **Keep Tier 3 version (`--ours`):**
-   - `README.md` — Project documentation
-   - `config/jumpstart.yml` — Project configuration
+   Filter the both-changed list to the paths that will actually need review (excluding paths the project-owned policy will overwrite back to the project version):
 
    ```bash
-   git checkout --ours README.md && git add README.md
-   git checkout --ours config/jumpstart.yml 2>/dev/null && git add config/jumpstart.yml 2>/dev/null
+   grep -Ev '^(app/|test/|README\.md$|CLAUDE\.md$|\.claude/|\.cursor/|Makefile$|compose\.yaml$|Dockerfile\.dev$|\.github/|docs/|templates/|UPGRADE\.md$|Gemfile$|Gemfile\.lock$|config/jumpstart\.yml$)' /tmp/jsp-sync-both-changed.txt > /tmp/jsp-sync-both-changed-needs-review.txt || true
    ```
 
-   **Accept Tier 2 version (`--theirs`):**
-   - `CLAUDE.md` — Upstream-owned (Tier 2 guidance lives in `.claude/rules/`)
-   - `.claude/rules/` — Tier 2 rules files (numbered 10-50)
-   - `Makefile` — Infrastructure
-   - `compose.yaml` — Docker configuration
-   - `Dockerfile.dev` — Development container
-   - `.github/workflows/ci.yml` — CI pipeline
-   - `docs/**` — Shared documentation
-   - `templates/**` — Project templates
-   - `test/seeds/**` — Seed integrity tests
+9. **Create a timestamped working branch**:
+   - Run `date +%Y%m%d`.
+   - Run `git checkout -b task/pull-upstream-YYYYMMDD`.
 
-   ```bash
-   git checkout --theirs CLAUDE.md && git add CLAUDE.md
-   git checkout --theirs .claude/rules/ 2>/dev/null && git add .claude/rules/ 2>/dev/null
-   git checkout --theirs Makefile compose.yaml Dockerfile.dev && git add Makefile compose.yaml Dockerfile.dev
-   git checkout --theirs .github/workflows/ci.yml 2>/dev/null && git add .github/workflows/ci.yml 2>/dev/null
-   git checkout --theirs docs/ && git add docs/
-   git checkout --theirs templates/ 2>/dev/null && git add templates/ 2>/dev/null
-   ```
+10. **Pre-merge audit**:
+    - Show the user the counts: project-only, upstream-only, and both-changed (with the "needs review" subset called out).
+    - Display the contents of `/tmp/jsp-sync-both-changed-needs-review.txt` so the user knows which paths Git will attempt to auto-merge.
+    - Use `AskUserQuestion` to ask whether to proceed with the merge. Options: continue, or stop here so the user can inspect manually.
 
-   **Manual review required:**
-   - `config/database.yml` — Keep customizations, accept structure changes
-   - `package.json` — Merge both if modified
+11. **Merge `jumpstart-pro/main`**:
+    - Run `git merge jumpstart-pro/main --no-commit --no-ff`.
+    - Do not commit; the next steps apply project-owned policy and verify the no-clobber invariant before the commit is created.
 
-   **Gemfile merge** (requires combining both versions):
+12. **Apply project-owned policy**:
 
-   Extract gems from both tiers:
-   ```bash
-   # Show Tier 3 Gemfile (current)
-   git show HEAD:Gemfile > /tmp/gemfile-tier3.rb
-   # Show Tier 2 Gemfile (incoming)
-   git show jsp-fork-master:Gemfile > /tmp/gemfile-tier2.rb
-   ```
+    Wholesale-restore project-owned paths to the project version. The same `git restore --source=HEAD` command removes `.cursor/` and `UPGRADE.md` because the project does not carry copies; for paths present in `HEAD`, files are restored to the project version, and for paths absent in `HEAD`, the staged and worktree copies brought in by the merge are removed.
 
-   Resolution approach:
-   1. Start with Tier 2 as base: `git checkout --theirs Gemfile`
-   2. Review `/tmp/gemfile-tier3.rb` for Tier 3-specific gems (app dependencies)
-   3. Add any missing Tier 3 gems back to Gemfile
-   4. Run `git add Gemfile`
+    ```bash
+    git restore --source=HEAD --staged --worktree -- \
+      app/ test/ README.md CLAUDE.md .claude/ .cursor/ Makefile compose.yaml \
+      Dockerfile.dev .github/ docs/ templates/ UPGRADE.md Gemfile Gemfile.lock
+    ```
 
-   Common Tier 3 gems to preserve (check `/tmp/gemfile-tier3.rb`):
-   - App-specific gems not in Tier 2
-   - Custom gem versions pinned for compatibility
-   - Development/test gems added locally
+    `test/seeds/` is restored as part of `test/`. `config/jumpstart.yml` is resolved in step 13.
 
-   After Gemfile is merged:
-   ```bash
-   git checkout --theirs Gemfile.lock
-   git add Gemfile.lock
-   # After merge completes, regenerate lock: make exec bundle lock
-   ```
+    Re-apply upstream additions under `app/` so new files (for example, new engine overrides) flow in:
 
-   **Preserve README-FORK.md** (Tier 2 reference):
-   - Run `git show jsp-fork-master:README.md > README-FORK.md`
-   - Run `git add README-FORK.md`
+    ```bash
+    git diff --name-only --diff-filter=A HEAD...jumpstart-pro/main -- app/ \
+      | xargs -I{} git checkout jumpstart-pro/main -- {} 2>/dev/null
+    git diff --name-only --diff-filter=A HEAD...jumpstart-pro/main -- app/ \
+      | xargs -I{} git add {} 2>/dev/null
+    ```
 
-   After resolving all conflicts, check for remaining:
-   - Run `git diff --name-only --diff-filter=U`
-   - If files remain, inform user which files need manual resolution and stop
+13. **Resolve remaining conflicts**:
 
-10. **Complete merge**:
-    - Run `git commit` (uses auto-generated merge message)
-    - If no conflicts occurred in step 7, run `git commit` to finalize the merge
+    Run `git diff --name-only --diff-filter=U` to list any files still in conflict (the wholesale-restore in step 12 resolved most project-owned paths). Handle remaining conflicts by category:
 
-11. **Push working branch**:
-    - Run `git push -u origin HEAD`
+    **Keep project version (`--ours`):**
+    - `config/jumpstart.yml`
+    ```bash
+    git checkout --ours config/jumpstart.yml 2>/dev/null && git add config/jumpstart.yml 2>/dev/null
+    ```
 
-12. **Create PR using /jsp-skills:ship**:
-    - Execute `/jsp-skills:ship` to create PR with auto-generated description and labels
-    - PR will reference the Tier 2 updates merged
+    **Manual review (pause for user):**
+    - `config/database.yml`, `package.json`: surface these files to the user with their conflict markers and ask for resolution before continuing.
+
+    **Any other remaining conflicts:**
+    - For each remaining conflicted path, present the project version, upstream version, and conflict markers to the user. Ask the user how to resolve: keep project, take upstream, or hand-edit. Stage each resolved file before continuing.
+
+    After resolution, run `git diff --name-only --diff-filter=U` and confirm the output is empty. If files remain, stop and inform the user.
+
+14. **Process Gemfile opt-in**:
+
+    The project's `Gemfile` was restored to the project version in step 12. Surface upstream gem changes so the user can opt in to anything they want:
+
+    ```bash
+    diff <(git show HEAD:Gemfile) <(git show jumpstart-pro/main:Gemfile) > /tmp/jsp-sync-gemfile-diff.txt
+    ```
+
+    Display the diff and use `AskUserQuestion` to ask whether to incorporate any upstream gem changes. If yes, edit the project's `Gemfile` per the user's choice and stage it. Inform the user that `Gemfile.lock` should be regenerated after the merge commit with `make exec bundle lock` (or `bundle lock`).
+
+15. **Verify the no-clobber invariant**:
+
+    Confirm that no path the project changed (but upstream did not) was modified by the merge process. After step 12, every path in `/tmp/jsp-sync-project-only.txt` should be byte-identical to the project's `HEAD`.
+
+    ```bash
+    : > /tmp/jsp-sync-clobbered.txt
+    while read -r path; do
+      [ -z "$path" ] && continue
+      if ! git diff --quiet HEAD -- "$path" 2>/dev/null \
+         || ! git diff --cached --quiet HEAD -- "$path" 2>/dev/null; then
+        echo "$path" >> /tmp/jsp-sync-clobbered.txt
+      fi
+    done < /tmp/jsp-sync-project-only.txt
+    ```
+
+    If `/tmp/jsp-sync-clobbered.txt` is non-empty: ABORT. Run `git merge --abort`, show the clobbered list to the user, and stop. The merge silently modified files only the project had changed; investigate before re-running.
+
+16. **Generate the divergence report**:
+
+    Write a markdown summary to `/tmp/jsp-sync-report.md`. Include these sections (omit any section whose corresponding list is empty):
+
+    - `### Upstream changes applied` — count of paths in `/tmp/jsp-sync-upstream-only.txt`. List the first 30 paths and add "and N more" if longer.
+    - `### Project changes preserved` — count of paths in `/tmp/jsp-sync-project-only.txt`. Confirm the no-clobber invariant held.
+    - `### Both-changed paths requiring review` — contents of `/tmp/jsp-sync-both-changed-needs-review.txt`. Add: "Git auto-merged or the conflicts were resolved manually. Review each path before approving the PR."
+    - `### Both-changed paths covered by project-owned policy` — contents of `/tmp/jsp-sync-both-changed.txt` minus the "needs review" subset. Add: "These paths were restored to the project version by the project-owned policy; no review required."
+    - `### Upstream additions not applied to project-owned paths` — new files upstream added under `CLAUDE.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml`. Compute with:
+
+      ```bash
+      git diff --name-only --diff-filter=A "$MERGE_BASE"...jumpstart-pro/main -- \
+        CLAUDE.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ \
+        docs/ templates/ test/seeds/ README.md config/jumpstart.yml
+      ```
+
+      Add: "Adopt selectively in a follow-up if desired."
+
+17. **Complete the merge**:
+    - Run `git commit` to finalize the merge commit.
+
+18. **Push the working branch**:
+    - Run `git push -u origin HEAD`.
+
+19. **Create the PR using /jsp-skills:ship**:
+    - Execute `/jsp-skills:ship`. When `/tmp/jsp-sync-report.md` exists, `/jsp-skills:ship` includes its contents in the PR body under a "Sync audit" section.
+
+20. **Clean up temporary files**:
+    - After `/jsp-skills:ship` returns, remove the sync hand-off and intermediate files: `rm -f /tmp/jsp-sync-*`.
+
+**Path policy:**
+
+| Path | Treatment |
+|------|-----------|
+| `app/` | Project owns; new upstream files under `app/` are re-applied so framework engine overrides flow in |
+| `test/` (including `test/seeds/`) | Project owns |
+| `README.md`, `CLAUDE.md`, `.claude/` | Project owns |
+| `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
+| `docs/`, `templates/` | Project owns |
+| `config/jumpstart.yml` | Project owns |
+| `Gemfile` | Project version kept; upstream gem changes surfaced for opt-in |
+| `Gemfile.lock` | Project version kept; regenerate with `bundle lock` after the merge commit |
+| `.cursor/`, `UPGRADE.md` | Upstream-only; `UPGRADE.md` is displayed during sync, then both are removed from the worktree before commit |
+| `config/database.yml`, `package.json` | Manual review during conflict resolution |
+| Rails substrate (`config/` other than above, `db/`, `lib/`, `bin/`, root dotfiles, `Rakefile`, anything else) | Divergence audit: project changes preserved, upstream changes applied, both-changed paths reported for review |
 
 **Example usage:**
 ```bash
 /jsp-skills:sync
 ```
 
-**What this skill does:**
-- Automates the Tier 3 update workflow
-- Protects Tier 3 directories (app/, test/) via wholesale restore after merge
-- Auto-resolves known conflicts using documented strategies
-- Creates a working branch for review instead of direct master push
-- Uses /jsp-skills:ship for consistent PR creation with proper labels
-- Follows the three-tier structure: Jumpstart Pro → Tier 2 → Tier 3
-
-**Directory protection and conflict resolution:**
-| File Type | Strategy | Reason |
-|-----------|----------|--------|
-| App code (app/) | Wholesale restore + re-apply Tier 2 additions | Tier 3 app code protected; new Tier 2 overrides (e.g., engine fixes) re-applied |
-| Tests (test/, except seeds) | Wholesale restore | Tier 3 application tests, protected from all Tier 2 changes |
-| Seed tests (test/seeds/) | Accept Tier 2 | Infrastructure tests from Tier 2 |
-| CLAUDE.md | Accept Tier 2 | Upstream-owned; Tier 2 guidance lives in `.claude/rules/` |
-| `.claude/rules/` (10-50) | Accept Tier 2 | Tier 2 infrastructure rules |
-| `.claude/rules/` (90+) | Keep Tier 3 | App-specific rules added by Tier 3 |
-| README.md | Keep Tier 3 | Project documentation |
-| Infrastructure (Makefile, compose.yaml, Dockerfile.dev) | Accept Tier 2 | Shared infrastructure |
-| Workflows (.github/workflows/) | Accept Tier 2 | CI/CD improvements |
-| Documentation (docs/) | Accept Tier 2 | Shared guides |
-| Dependencies (Gemfile) | Tier 2 base + Tier 3 gems | Infrastructure from Tier 2, app gems from Tier 3 |
-
 **When to use:**
-- Periodically to stay current with Tier 2 infrastructure improvements
-- Before major releases to ensure latest Tier 2 changes are included
-- After Tier 2 maintainers announce updates
-
-**Reference:** See `docs/tier3/UPDATING.md` for manual workflow and troubleshooting.
+- Periodically to stay current with Jumpstart Pro Rails improvements.
+- Before major releases to ensure the latest upstream changes are included.
+- After upstream maintainers announce updates.

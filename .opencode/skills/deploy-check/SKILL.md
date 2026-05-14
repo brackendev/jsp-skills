@@ -91,4 +91,4 @@ After checklist passes, the `deployment-specialist` skill activates automaticall
 ## Reference Documentation
 
 - Kamal docs: https://kamal-deploy.org/docs/
-- Testing guide: https://github.com/brackendev/jumpstart-pro-fork/blob/master/docs/shared/TESTING.md
+- Testing guide: see `docs/shared/TESTING.md` in the JSP upstream
