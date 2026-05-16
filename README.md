@@ -1,79 +1,73 @@
 # jsp-skills
 
-Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment. Distributed as an APM plugin (`type: skill`) that installs into every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, and Windsurf.
+[Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, Hotwire, migrations, and deployment to every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, and Windsurf.
+
+Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/jsp-skills:sync`, `/jsp-skills:deploy-check`); the rest activate automatically from conversation context.
 
 Source: <https://github.com/brackendev/jsp-skills>. APM shorthand: `brackendev/jsp-skills`.
 
-## Installation
+## Install
 
-Project scope (writes into the consumer project):
+This plugin is distributed through APM, so install [APM](https://github.com/microsoft/apm) first if you don't already have it. Then, in a project:
 
 ```bash
-cd /absolute/path/to/your-project
 apm install brackendev/jsp-skills --target all
 ```
 
-User scope (writes under `~/`):
+Globally for your user account:
 
 ```bash
 apm install brackendev/jsp-skills -g --target all
 ```
 
-Refresh dependencies with `apm update [-g]`. Remove with `apm uninstall brackendev/jsp-skills [-g]`. A local filesystem path can replace the shorthand at either scope.
+Update with `apm update [-g]`. Remove with `apm uninstall brackendev/jsp-skills [-g]`. A local filesystem path can replace the shorthand at either scope.
 
-## Skills
+## Quick start
 
-All skills follow the [Agent Skills](https://agentskills.io) open standard. Skill source lives under `.apm/skills/<name>/SKILL.md`, with a `SKILL.md` mirror under `.opencode/skills/<name>/` for local OpenCode validation.
+Slash commands run inside your agent runtime (Claude Code, Codex CLI, OpenCode, and the rest), not at a shell prompt. The shell-styled code blocks below are formatted that way for readability.
 
-### User-Invocable
-
-Trigger explicitly with `/jsp-skills:<name>` (or `$<name>` in runtimes that use that prefix).
-
-#### `deploy-check`
-
-Pre-deployment verification checklist before production release.
-
-```bash
-/jsp-skills:deploy-check
-```
-
-#### `sync`
-
-Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and push it for review. The project repository must have the JSP repository configured as a Git remote named `jumpstart-pro`.
+Pull upstream changes from Jumpstart Pro Rails:
 
 ```bash
 /jsp-skills:sync
 ```
 
-The skill's first priority is that project customizations are never silently overwritten. To deliver that guarantee it:
+Run pre-deployment checks before a production release:
+
+```bash
+/jsp-skills:deploy-check
+```
+
+The remaining skills (account scoping, migration safety, billing, Hotwire, and the rest) activate automatically when their domain comes up. They cannot be invoked directly.
+
+## Skills
+
+### User-invocable
+
+#### `/jsp-skills:sync`
+
+Merge the latest Jumpstart Pro Rails upstream changes into a project that started from the Jumpstart Pro template. The skill's first priority is that project customizations are never silently overwritten.
+
+Requires a Git remote named `jumpstart-pro` pointing at the Jumpstart Pro Rails repository. Add it with `git remote add jumpstart-pro <jsp-repo-url>` if it does not already exist.
+
+What the skill does:
 
 - Detects the project's primary branch and refuses to run with a dirty working tree.
-- Displays the upstream `UPGRADE.md` before merging so the maintainer reviews upgrade notes first.
-- Computes the merge base between the project and `jumpstart-pro/main`, then classifies every changed path as project-only, upstream-only, or both-changed. The both-changed list is shown before the merge so the maintainer knows which files Git will auto-merge.
-- Applies a project-owned policy that wholesale-restores explicit paths to the project version after the merge.
-- Verifies a no-clobber invariant before commit: every project-only path must be byte-identical to the project's `HEAD`. If any project-only path was modified, the merge aborts.
-- Writes a markdown sync-audit report to `/tmp/jsp-sync-report.md` and stops after pushing the working branch. The user opens the PR with their own preferred workflow and includes the report under a `## Sync audit` section in the PR body.
+- Displays the upstream `UPGRADE.md` before merging so upgrade notes are reviewed first.
+- Computes the merge base, classifies every changed path as project-only, upstream-only, or both-changed, and surfaces the both-changed list before the merge.
+- Wholesale-restores project-owned paths after the merge so customizations survive.
+- Verifies a no-clobber invariant: every project-only path must be byte-identical to the project's `HEAD` before commit. If any were modified, the merge aborts.
+- Writes a sync-audit report to `/tmp/jsp-sync-report.md` and stops after pushing the working branch. Open the pull request with your own workflow and paste the report under a `## Sync audit` section in the body.
 
-Path policy:
+The full path policy and step-by-step procedure live in `.apm/skills/sync/SKILL.md`.
 
-| Path | Treatment |
-|------|-----------|
-| `app/` | Project owns. Upstream should not add files here; framework additions belong under `lib/jumpstart/app/`. |
-| `lib/jumpstart/app/` | Upstream owns. Framework engine overrides flow in through the divergence audit. Project edits here are drift and should move to overrides under `app/`. |
-| `test/` (including `test/seeds/`) | Project owns |
-| `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
-| `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
-| `docs/`, `templates/` | Project owns |
-| `config/jumpstart.yml` | Project owns |
-| `Gemfile` | Project version kept; upstream gem changes surfaced for opt-in |
-| `Gemfile.lock` | Project version kept; regenerate with `bundle lock` after the merge commit |
-| `.cursor/`, `UPGRADE.md` | Upstream-only; `UPGRADE.md` is displayed during sync, neither is copied into the project |
-| `config/database.yml`, `package.json` | Manual review during conflict resolution |
-| Rails substrate (`config/` other than above, `db/`, `lib/`, `bin/`, root dotfiles, `Rakefile`, anything else) | Divergence audit: project changes preserved, upstream changes applied, both-changed paths reported for review |
+#### `/jsp-skills:deploy-check`
 
-### Auto-Triggered
+Pre-deployment verification checklist before a production release.
 
-These skills activate automatically based on conversation context.
+### Auto-triggered
+
+These activate from conversation context. They cannot be invoked directly.
 
 | Skill | Triggers |
 |-------|----------|
@@ -83,7 +77,7 @@ These skills activate automatically based on conversation context.
 
 ### Specialists
 
-These skills activate automatically when their domain comes up. They carry the deeper Jumpstart Pro patterns for each area.
+Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for each area and coordinate with each other (for example, `hotwire-specialist` defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`).
 
 | Skill | Activates on |
 |-------|--------------|
@@ -95,6 +89,10 @@ These skills activate automatically when their domain comes up. They carry the d
 | `multi-tenancy-specialist` | Account scoping, `Current.account` patterns, AccountRecord inheritance, Pundit policies, tenant isolation queries, account switching, impersonation |
 | `security-auditor` | Security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, Rails security best practices |
 
-Skills coordinate with each other: for example, the `hotwire-specialist` skill defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`.
+## Contributing
 
-Working on the plugin source: see [CONTRIBUTING.md](CONTRIBUTING.md).
+To work on the plugin source, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

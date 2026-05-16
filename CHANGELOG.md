@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `README.md` and `CONTRIBUTING.md` restructured for new-user onboarding. The README leads with a single install command, adds a quick-start section, and groups the skill catalog into User-invocable, Auto-triggered, and Specialists. The duplicated path policy table is removed from the README; the full policy continues to live in `.apm/skills/sync/SKILL.md`. `CONTRIBUTING.md` moves the file layout into a table, breaks out the APM lockfile rule into its own section, and adds an "Adding or modifying a skill" step list.
+
 ## [0.1.4] - 2026-05-14
 
 ### Changed
