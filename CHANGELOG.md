@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - `README.md` and `CONTRIBUTING.md` restructured for new-user onboarding. The README leads with a single install command, adds a quick-start section, and groups the skill catalog into User-invocable, Auto-triggered, and Specialists. The duplicated path policy table is removed from the README; the full policy continues to live in `.apm/skills/sync/SKILL.md`. `CONTRIBUTING.md` moves the file layout into a table, breaks out the APM lockfile rule into its own section, and adds an "Adding or modifying a skill" step list.
+- The `api-specialist` and `billing-specialist` skills no longer hard-code Context7 as the only documentation source. The "Using Context7 for Current Documentation" sections are renamed to "Fetching current library documentation" and reworded so the model uses whichever documentation lookup the host runtime provides (Context7 MCP server, built-in web search, or a project-local source). Context7's `resolve-library-id` and `get-library-docs` calls remain as worked examples rather than required tools, so the skills work on every runtime APM targets, including those without Context7 installed.
+- The `migration-safety` skill's reference to the JSP upstream agent guidelines file accepts both `CLAUDE.md` and `AGENTS.md` instead of naming only the Claude Code-conventional filename. The JSP template ships `CLAUDE.md`; project repositories may also expose it as `AGENTS.md` for runtimes that prefer that convention.
 
 ## [0.1.4] - 2026-05-14
 

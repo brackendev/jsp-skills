@@ -30,13 +30,13 @@ Use this agent automatically when user intent includes:
 ✅ **Payment failure handling** and dunning workflows
 ✅ **Marketing automation** (ConvertKit, Drip, Mailchimp integration)
 
-## Using Context7 for Current Documentation
+## Fetching current library documentation
 
-**When implementing payment processor features, proactively fetch current documentation using the MCP Context7 tools.**
+**Before implementing payment processor features, fetch current documentation so the code reflects the latest API.** Use whichever documentation lookup the host runtime provides. Common options: an installed Context7 MCP server, the runtime's built-in web search, or a project-local documentation source. The library IDs and topics below assume Context7's `resolve-library-id` and `get-library-docs` workflow; adapt them to the mechanism available.
 
 **Step 1: Get documentation (use exact library IDs)**
 
-Use the `get-library-docs` tool with these parameters:
+If Context7 is available, call `get-library-docs` with these parameters. With other lookup mechanisms, supply the same library and topic information in the form that mechanism accepts:
 
 **Stripe:**
 ```
@@ -112,13 +112,14 @@ Use the fetched API patterns combined with the multi-tenancy and Pay gem pattern
 - Payment method handling → topic: "payment methods", tokens: 5000
 - Per-seat pricing implementation → topic: "subscriptions", tokens: 5000
 
-**When to use resolve-library-id:**
+**When the processor is not listed above:**
 
-Only when integrating a payment processor not listed above. Example:
+Look up the library ID before fetching docs. With Context7, call `resolve-library-id` with the library name, then pass the resolved ID to `get-library-docs`. With other lookup mechanisms, perform the equivalent search by library name and topic.
+
 ```
 User asks: "Integrate with Lemon Squeezy"
-→ Use resolve-library-id with "lemon-squeezy"
-→ Then use get-library-docs with the resolved ID
+→ Resolve "lemon-squeezy" to its documentation ID (Context7: `resolve-library-id`)
+→ Fetch docs with the resolved ID (Context7: `get-library-docs`)
 ```
 
 **Why this matters:**

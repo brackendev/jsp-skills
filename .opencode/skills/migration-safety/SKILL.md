@@ -424,7 +424,7 @@ Check existing migrations in `db/migrate/` for patterns
 See `config/database.yml` in the JSP upstream
 
 **Migration patterns:**
-See the architecture section of the JSP upstream `CLAUDE.md`
+See the architecture section of the JSP upstream agent guidelines file (`CLAUDE.md`, or `AGENTS.md` if the runtime convention prefers that name).
 
 **Rails migration guides:**
 https://guides.rubyonrails.org/active_record_migrations.html
