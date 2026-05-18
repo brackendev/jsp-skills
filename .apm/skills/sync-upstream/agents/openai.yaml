@@ -1,0 +1,8 @@
+interface:
+  display_name: "Sync Upstream"
+  short_description: "Merge Jumpstart Pro Rails upstream changes into the project on a working branch, preserving project customizations."
+  default_prompt: "Use sync-upstream to merge Jumpstart Pro Rails upstream changes into the project. Pass --report to produce the divergence audit only, without merging."
+  brand_color: "#D14"
+
+policy:
+  allow_implicit_invocation: false

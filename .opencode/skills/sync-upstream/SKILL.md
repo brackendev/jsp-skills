@@ -1,6 +1,6 @@
 ---
-name: sync
-description: Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and push it for review, preserving project customizations through a merge-base divergence audit
+name: sync-upstream
+description: Mutating skill. Merge Jumpstart Pro Rails (JSP) upstream changes into the project on a working branch and push it for review, preserving project customizations through a merge-base divergence audit. Pass `--report` to produce the divergence audit only, without merging, committing, or pushing.
 allowed-tools: Bash(git checkout:*), Bash(git fetch:*), Bash(git pull:*), Bash(git branch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git push:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git diff:*), Bash(git status:*), Bash(git restore:*), Bash(git remote:*), Bash(git symbolic-ref:*), Bash(date:*), Bash(comm:*), Bash(sort:*), Bash(diff:*), Bash(grep:*), Bash(sed:*), Bash(wc:*), Bash(cat:*), Bash(rm:*), Read, AskUserQuestion
 user-invocable: true
 disable-model-invocation: true
@@ -14,7 +14,24 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
 
 - The project has the Jumpstart Pro Rails repository configured as a Git remote named `jumpstart-pro`. Verify with `git remote -v`. If the remote is missing, add it with `git remote add jumpstart-pro <jsp-repo-url>` before running this skill.
 
-**Arguments:** None
+## Arguments
+
+| Input             | Effect                                                                                          |
+|-------------------|-------------------------------------------------------------------------------------------------|
+| (no argument)     | Merge `jumpstart-pro/main` into the project, run the divergence audit, push the working branch. |
+| `all`             | Same as no argument. Accepted for family consistency.                                           |
+| `<path>` `<glob>` | Same as no argument. The merge spans the whole repository; per-path scope is not meaningful. Accepted for family consistency. |
+| `--report`        | Run the divergence audit only. Write `/tmp/jsp-sync-report.md` and stop before the merge. No worktree changes, no commit, no push. |
+
+Only the literal token `--report` triggers report mode. Natural-language phrases such as `preview` or `dry run` are treated as scope input and ignored.
+
+## Mutation
+
+The skill mutates by default: it merges `jumpstart-pro/main`, applies the project-owned path policy, resolves remaining conflicts (pausing for operator input where the policy requires manual review), commits the merge, and pushes the working branch to `origin`.
+
+Under `--report`, the skill runs steps 1-10 only (clean up, verify remote, detect primary branch, refuse a dirty worktree, fetch, review upgrade notes, update primary branch, compute divergence, create the timestamped working branch, run the pre-merge audit), then writes `/tmp/jsp-sync-report.md` with the path counts and the both-changed-needs-review list and stops. Steps 11-19 (the merge, project-owned restore, conflict resolution, Gemfile opt-in, no-clobber verification, drift detection, commit, push) are skipped. The audit file is the report.
+
+Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes; they are the audit evidence rather than project mutations.
 
 **Steps:**
 
@@ -65,13 +82,15 @@ JSP is shorthand for Jumpstart Pro Rails (https://jumpstartrails.com/), a paid S
    ```
 
 9. **Create a timestamped working branch**:
+   - Skip this step when invoked with `--report`.
    - Run `date +%Y%m%d`.
    - Run `git checkout -b task/pull-upstream-YYYYMMDD`.
 
 10. **Pre-merge audit**:
     - Show the user the counts: project-only, upstream-only, and both-changed (with the "needs review" subset called out).
     - Display the contents of `/tmp/jsp-sync-both-changed-needs-review.txt` so the user knows which paths Git will attempt to auto-merge.
-    - Use `AskUserQuestion` to ask whether to proceed with the merge. Options: continue, or stop here so the user can inspect manually.
+    - When invoked with `--report`: write a pre-merge audit to `/tmp/jsp-sync-report.md` containing the path counts, the upstream-only list (first 30 paths with "and N more" if longer), the project-only list (same), the both-changed-needs-review list in full, and a note that this is a pre-merge audit only (no merge was performed). Report the file path to the user and stop. Do not run steps 11-19.
+    - Otherwise, use `AskUserQuestion` to ask whether to proceed with the merge. Options: continue, or stop here so the user can inspect manually.
 
 11. **Merge `jumpstart-pro/main`**:
     - Run `git merge jumpstart-pro/main --no-commit --no-ff`.
@@ -217,11 +236,21 @@ Phase A (structural). For each affected path, create an override under `app/` at
 Phase B (reconciliation). Per area (for example, `application/*`, `devise/*`, `notifications/*`), compare each override against the corresponding upstream source under `lib/jumpstart/app/` and adopt upstream's improvements where they don't conflict with project customizations. Translation key renames require matching updates to `config/locales/en.yml`. Phase B is one PR per area so each reconciliation is reviewable on its own.
 
 **Example usage:**
+
+Run the full sync (merge, commit, push):
+
 ```bash
-/jsp-skills:sync
+/jsp-skills:sync-upstream
+```
+
+Produce the divergence audit only, without merging:
+
+```bash
+/jsp-skills:sync-upstream --report
 ```
 
 **When to use:**
 - Periodically to stay current with Jumpstart Pro Rails improvements.
 - Before major releases to ensure the latest upstream changes are included.
 - After upstream maintainers announce updates.
+- With `--report`, before a planned sync to preview which paths will need review.

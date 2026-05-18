@@ -1,8 +1,0 @@
-interface:
-  display_name: "Sync"
-  short_description: "Merge Jumpstart Pro Rails upstream changes into the project and open a PR, preserving project customizations."
-  default_prompt: "Use sync to merge Jumpstart Pro Rails upstream changes into the project."
-  brand_color: "#D14"
-
-policy:
-  allow_implicit_invocation: false

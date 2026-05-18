@@ -2,7 +2,7 @@
 
 [Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, Hotwire, migrations, and deployment to every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, and Windsurf.
 
-Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/jsp-skills:sync`, `/jsp-skills:deploy-check`); the rest activate automatically from conversation context.
+Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/jsp-skills:sync-upstream`, `/jsp-skills:deploy-check`); the rest activate automatically from conversation context. Argument grammar, scope vocabulary, and the `--report` convention are documented in [CONVENTIONS.md](CONVENTIONS.md).
 
 Source: <https://github.com/brackendev/jsp-skills>. APM shorthand: `brackendev/jsp-skills`.
 
@@ -29,7 +29,7 @@ Slash commands run inside your agent runtime (Claude Code, Codex CLI, OpenCode, 
 Pull upstream changes from Jumpstart Pro Rails:
 
 ```bash
-/jsp-skills:sync
+/jsp-skills:sync-upstream
 ```
 
 Run pre-deployment checks before a production release:
@@ -44,9 +44,9 @@ The remaining skills (account scoping, migration safety, billing, Hotwire, and t
 
 ### User-invocable
 
-#### `/jsp-skills:sync`
+#### `/jsp-skills:sync-upstream`
 
-Merge the latest Jumpstart Pro Rails upstream changes into a project that started from the Jumpstart Pro template. The skill's first priority is that project customizations are never silently overwritten.
+Mutating skill. Merge the latest Jumpstart Pro Rails upstream changes into a project that started from the Jumpstart Pro template. The skill's first priority is that project customizations are never silently overwritten.
 
 Requires a Git remote named `jumpstart-pro` pointing at the Jumpstart Pro Rails repository. Add it with `git remote add jumpstart-pro <jsp-repo-url>` if it does not already exist.
 
@@ -59,11 +59,13 @@ What the skill does:
 - Verifies a no-clobber invariant: every project-only path must be byte-identical to the project's `HEAD` before commit. If any were modified, the merge aborts.
 - Writes a sync-audit report to `/tmp/jsp-sync-report.md` and stops after pushing the working branch. Open the pull request with your own workflow and paste the report under a `## Sync audit` section in the body.
 
-The full path policy and step-by-step procedure live in `.apm/skills/sync/SKILL.md`.
+Pass `--report` to produce the divergence audit only. The skill runs the fetch and classification steps, writes `/tmp/jsp-sync-report.md`, and stops before merging, committing, or pushing.
+
+The full path policy and step-by-step procedure live in `.apm/skills/sync-upstream/SKILL.md`.
 
 #### `/jsp-skills:deploy-check`
 
-Pre-deployment verification checklist before a production release.
+Pure report. Pre-deployment verification checklist before a production release.
 
 ### Auto-triggered
 

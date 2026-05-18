@@ -1,6 +1,6 @@
 ---
 name: deploy-check
-description: Pre-deployment verification checklist before production release
+description: Pure report. Pre-deployment verification checklist before production release. Produces a go/no-go with evidence and makes no changes to the project.
 allowed-tools: Read, Bash
 user-invocable: true
 disable-model-invocation: true

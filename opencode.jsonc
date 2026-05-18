@@ -12,7 +12,7 @@
       "migration-safety": "allow",
       "multi-tenancy-specialist": "allow",
       "security-auditor": "allow",
-      "sync": "allow",
+      "sync-upstream": "allow",
       "troubleshooting": "allow"
     }
   }

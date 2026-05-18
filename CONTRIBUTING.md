@@ -20,6 +20,8 @@ Do not add `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/marketplace.jso
 
 ## Adding or modifying a skill
 
+For user-invocable skills, read [CONVENTIONS.md](CONVENTIONS.md) first. It defines the argument grammar, scope vocabulary, mutation-versus-report classification, and section structure every user-invocable skill follows, and includes an author checklist.
+
 1. Edit `.apm/skills/<name>/SKILL.md`.
 2. Mirror the change to `.opencode/skills/<name>/SKILL.md` (byte-identical).
 3. Update `README.md` if the change is user-facing.

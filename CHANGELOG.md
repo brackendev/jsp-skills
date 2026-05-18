@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-05-18
+
+### Added
+
+- `CONVENTIONS.md` documents how user-invocable skills receive arguments, declare scope, and choose between mutation and report behavior. New skills follow the three rules (argument grammar, scope vocabulary, mutation as the default), the classification taxonomy, the section-structure rules, and the author checklist in that file. `CONTRIBUTING.md` points to it as required reading for skill authors.
+
+### Changed
+
+- The `sync` skill is renamed to `sync-upstream`. Operators with saved invocations of `/jsp-skills:sync` should update them to `/jsp-skills:sync-upstream`. The OpenCode permission entry under `opencode.jsonc` and the OpenAI runtime display name follow the rename.
+- The `sync-upstream` skill grows a `--report` flag. Default behavior continues to merge `jumpstart-pro/main`, run the divergence audit, commit, and push the working branch. With `--report`, the skill runs the fetch and classification steps, writes `/tmp/jsp-sync-report.md`, and stops before merging, committing, or pushing. Only the literal token `--report` triggers report mode; natural-language phrases such as `preview` or `dry run` are treated as scope input.
+- The `deploy-check` skill description classifies it explicitly as a pure report. The skill's behavior is unchanged: it runs a fixed verification checklist and produces a go/no-go with evidence, making no changes to the project.
+
+## [0.1.5] - 2026-05-18
+
 ### Changed
 
 - `README.md` and `CONTRIBUTING.md` restructured for new-user onboarding. The README leads with a single install command, adds a quick-start section, and groups the skill catalog into User-invocable, Auto-triggered, and Specialists. The duplicated path policy table is removed from the README; the full policy continues to live in `.apm/skills/sync/SKILL.md`. `CONTRIBUTING.md` moves the file layout into a table, breaks out the APM lockfile rule into its own section, and adds an "Adding or modifying a skill" step list.
