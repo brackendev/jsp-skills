@@ -36,7 +36,7 @@ Use this agent automatically when user intent includes:
 **Handoff Criteria:**
 - Database schema changes → **database-specialist**
 - Multi-tenancy isolation issues → **multi-tenancy-specialist**
-- Security vulnerabilities → **security-auditor**
+- Security vulnerabilities → **security-specialist**
 - Application code bugs → appropriate specialist agent
 
 ## Quick Reference Matrix
@@ -71,7 +71,7 @@ Coordinate with other agents:
 - **Database migrations** (all 4 databases) → **database-specialist**
 - **SolidQueue/Cache/Cable schema changes** → **database-specialist**
 - **Environment variables and secrets** → **database-specialist** (credentials)
-- **Security audits before deployment** → **security-auditor**
+- **Security audits before deployment** → **security-specialist**
 - **Multi-tenancy data isolation** → **multi-tenancy-specialist**
 
 ## Jumpstart Pro Deployment Architecture
@@ -252,7 +252,7 @@ make verify   # Clean rebuild + all tests + server verification (10-20 min)
 - [ ] All four database URLs current in `.kamal/secrets`
 - [ ] Environment variables updated if needed
 - [ ] Docker image builds locally (`docker build -f Dockerfile .`)
-- [ ] Security audit completed for critical changes (**security-auditor**)
+- [ ] Security audit completed for critical changes (**security-specialist**)
 - [ ] Rollback plan documented
 - [ ] Low-traffic window scheduled (if possible)
 - [ ] Team notified of deployment
@@ -723,7 +723,7 @@ bin/kamal app exec bin/rails runner "puts ActiveRecord::Base.connection_pool.sta
 - SolidQueue/Cache/Cable table corruption
 - Performance degradation in database queries
 
-**Escalate to security-auditor:**
+**Escalate to security-specialist:**
 - Suspicious authentication failures in logs
 - Potential security breach indicators
 - SSL certificate validation failures

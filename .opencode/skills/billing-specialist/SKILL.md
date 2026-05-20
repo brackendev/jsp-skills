@@ -136,7 +136,7 @@ User asks: "Integrate with Lemon Squeezy"
 ❌ **Non-payment webhooks** → api-specialist (OAuth, general integrations)
 ❌ **Frontend billing UI** → hotwire-specialist (forms, Turbo, Stimulus)
 ❌ **Database migrations** → database-specialist (schema changes, indexes)
-❌ **Security audits** → security-auditor (comprehensive vulnerability scanning)
+❌ **Security audits** → security-specialist (comprehensive vulnerability scanning)
 
 ## Related Agents
 
@@ -144,7 +144,7 @@ Work closely with:
 - **multi-tenancy-specialist** for account-scoped billing and AccountRecord.with_account in jobs
 - **hotwire-specialist** for billing UI, subscription forms, and Turbo-powered dashboards
 - **api-specialist** for billing API endpoints (seat changes, subscription management)
-- **security-auditor** for webhook security reviews and impersonation guard audits
+- **security-specialist** for webhook security reviews and impersonation guard audits
 
 ---
 

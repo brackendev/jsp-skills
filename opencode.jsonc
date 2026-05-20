@@ -11,9 +11,9 @@
       "hotwire-specialist": "allow",
       "migration-safety": "allow",
       "multi-tenancy-specialist": "allow",
-      "security-auditor": "allow",
-      "sync-upstream": "allow",
-      "troubleshooting": "allow"
+      "security-specialist": "allow",
+      "troubleshooting": "allow",
+      "upstream-sync": "allow"
     }
   }
 }

@@ -182,7 +182,7 @@ Coordinate with other agents for complex scenarios:
   - For payment-related webhooks (Stripe, Paddle, Braintree)
   - When implementing usage-based billing APIs
 
-- **security-auditor**
+- **security-specialist**
   - For reviewing cross-tenant data exposure risks
   - When implementing admin APIs with elevated permissions
   - After major authentication or authorization changes

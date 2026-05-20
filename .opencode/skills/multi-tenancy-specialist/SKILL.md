@@ -46,13 +46,13 @@ Use this agent automatically when user intent includes:
 ❌ **Database migrations** → database-specialist (schema changes, multi-DB)
 ❌ **Production deployments** → deployment-specialist (Kamal, server operations)
 ❌ **Performance issues** → database-specialist (N+1 queries, indexes)
-❌ **Security audits** → security-auditor (comprehensive vulnerability scanning)
+❌ **Security audits** → security-specialist (comprehensive vulnerability scanning)
 
 ## Related Agents
 
 Work closely with:
 - **billing-specialist** for account-scoped billing and subscriptions
-- **security-auditor** for multi-tenancy isolation reviews
+- **security-specialist** for multi-tenancy isolation reviews
 - **api-specialist** for account-scoped API endpoints
 - **hotwire-specialist** for implementing UI with multi-tenancy patterns
 - **database-specialist** for multi-tenant schema design

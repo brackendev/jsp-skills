@@ -430,7 +430,7 @@ If issues persist, the appropriate specialist skill will activate based on conte
 - **Multi-tenancy:** `multi-tenancy-specialist`
 - **Billing/Pay gem:** `billing-specialist`
 - **Frontend/Hotwire:** `hotwire-specialist`
-- **Security:** `security-auditor`
+- **Security:** `security-specialist`
 - **Deployment:** `deployment-specialist`
 
 ---

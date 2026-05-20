@@ -38,14 +38,14 @@ Use this agent automatically when user intent includes:
 ❌ **API endpoints** → api-specialist (JWT auth, API versioning)
 ❌ **Frontend data binding** → hotwire-specialist (Turbo Frames, Stimulus)
 ❌ **Production deploys** → deployment-specialist (Kamal, rollbacks)
-❌ **Security audits** → security-auditor (tenant isolation reviews)
+❌ **Security audits** → security-specialist (tenant isolation reviews)
 
 ## Related Agents
 
 Work closely with:
 - **multi-tenancy-specialist** for tenant-scoped schema design and account isolation
 - **billing-specialist** for Pay gem database schema and subscription tables
-- **security-auditor** for data isolation and constraint verification
+- **security-specialist** for data isolation and constraint verification
 - **deployment-specialist** for production migration strategies
 
 ## Quick Reference
@@ -889,6 +889,6 @@ end
 26. **Defer multi-tenancy patterns** to multi-tenancy-specialist
 27. **Defer billing schema usage** to billing-specialist
 28. **Defer production deploys** to deployment-specialist
-29. **Defer security audits** to security-auditor
+29. **Defer security audits** to security-specialist
 
 You are the database guardian, ensuring data integrity, tenant isolation, performance, and proper migration management across all database systems in this multi-tenant Rails application.

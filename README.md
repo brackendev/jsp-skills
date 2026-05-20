@@ -2,7 +2,7 @@
 
 [Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, Hotwire, migrations, and deployment to every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, and Windsurf.
 
-Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/jsp-skills:sync-upstream`, `/jsp-skills:deploy-check`); the rest activate automatically from conversation context. Argument grammar, scope vocabulary, and the `--report` convention are documented in [CONVENTIONS.md](CONVENTIONS.md).
+Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/upstream-sync`, `/deploy-check`); the rest activate automatically from conversation context. Argument grammar, scope vocabulary, and the `--report` convention are documented in [CONVENTIONS.md](CONVENTIONS.md).
 
 Source: <https://github.com/brackendev/jsp-skills>. APM shorthand: `brackendev/jsp-skills`.
 
@@ -29,13 +29,13 @@ Slash commands run inside your agent runtime (Claude Code, Codex CLI, OpenCode, 
 Pull upstream changes from Jumpstart Pro Rails:
 
 ```bash
-/jsp-skills:sync-upstream
+/upstream-sync
 ```
 
 Run pre-deployment checks before a production release:
 
 ```bash
-/jsp-skills:deploy-check
+/deploy-check
 ```
 
 The remaining skills (account scoping, migration safety, billing, Hotwire, and the rest) activate automatically when their domain comes up. They cannot be invoked directly.
@@ -44,7 +44,7 @@ The remaining skills (account scoping, migration safety, billing, Hotwire, and t
 
 ### User-invocable
 
-#### `/jsp-skills:sync-upstream`
+#### `/upstream-sync`
 
 Mutating skill. Merge the latest Jumpstart Pro Rails upstream changes into a project that started from the Jumpstart Pro template. The skill's first priority is that project customizations are never silently overwritten.
 
@@ -61,9 +61,9 @@ What the skill does:
 
 Pass `--report` to produce the divergence audit only. The skill runs the fetch and classification steps, writes `/tmp/jsp-sync-report.md`, and stops before merging, committing, or pushing.
 
-The full path policy and step-by-step procedure live in `.apm/skills/sync-upstream/SKILL.md`.
+The full path policy and step-by-step procedure live in `.apm/skills/upstream-sync/SKILL.md`.
 
-#### `/jsp-skills:deploy-check`
+#### `/deploy-check`
 
 Pure report. Pre-deployment verification checklist before a production release.
 
@@ -89,7 +89,7 @@ Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for eac
 | `deployment-specialist` | Production deployments, server management, rollbacks, deployment troubleshooting, infrastructure configuration |
 | `hotwire-specialist` | Turbo Frames/Streams, Stimulus controllers, TailwindCSS styling, View Components, Import Maps, interactive UI features |
 | `multi-tenancy-specialist` | Account scoping, `Current.account` patterns, AccountRecord inheritance, Pundit policies, tenant isolation queries, account switching, impersonation |
-| `security-auditor` | Security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, Rails security best practices |
+| `security-specialist` | Security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, Rails security best practices |
 
 ## Contributing
 

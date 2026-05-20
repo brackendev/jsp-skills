@@ -1,7 +1,7 @@
 interface:
-  display_name: "Security Auditor"
+  display_name: "Security Specialist"
   short_description: "Comprehensive security audits."
-  default_prompt: "Use security-auditor for a security review."
+  default_prompt: "Use security-specialist for a security review."
   brand_color: "#D14"
 
 policy:

@@ -66,14 +66,14 @@ A skill that does not operate on a file or diff scope does not carry a scope tab
 
 A skill that can mutate the workspace applies its changes when invoked. The operator passes `--report` to receive a description of what the skill would do without modifying any files.
 
-Naming reinforces the default. Commands whose primary work is mutation carry verbs that imply change (`/sync-upstream`, and future `/fix-*`, `/commit`, `/prune-*`, `/rebuild-*` skills). Operators who type a `/sync-*` command expect the skill to sync.
+Naming reinforces the default. Commands follow a noun-first `<target>-<verb>` pattern, so the trailing verb signals behavior. Mutating commands carry verb suffixes that imply change (`-sync`, `-fix`, `-prune`, `-rebuild`, `-deploy`, `-new`, `-upgrade`, `-test`, `-create`, `-apply`); in this package, `/upstream-sync`. Operators who type a `*-sync` command expect the skill to sync. Pure-report skills carry reading-verb suffixes (`-review`, `-audit`, `-check`); in this package, `/deploy-check`.
 
 - Default (no `--report`): apply the skill's recommended changes. Stop on unfixable failures the same way the skill always did.
 - `--report` produces a description of what the skill would change, with the same evidence and findings the default run would generate. The skill writes no files, runs no formatters in write mode, and creates no external state under `--report`. Pre-existing scratch artifacts the skill always produces (for example, `/tmp/jsp-sync-*` audit files) are still written because they are the report.
 
 ### Only the literal token
 
-Only the exact token `--report` enables the report-only mode. Natural-language phrases such as "describe the changes" or "show me what would happen" are scope or focus input, not a mode trigger. An operator who types `/sync-upstream report` receives a scope-narrowed mutation run, not a report. An operator who types `/sync-upstream --report` receives the description and nothing else changes on disk.
+Only the exact token `--report` enables the report-only mode. Natural-language phrases such as "describe the changes" or "show me what would happen" are scope or focus input, not a mode trigger. An operator who types `/upstream-sync report` receives a scope-narrowed mutation run, not a report. An operator who types `/upstream-sync --report` receives the description and nothing else changes on disk.
 
 This rule exists to prevent accidental report-mode invocation that an operator expected to mutate.
 
@@ -87,7 +87,7 @@ Mutation is the default. They may carry a `--report` flag when a preview mode is
 
 | Skill             | `--report` available? | Notes                                                                                                  |
 |-------------------|------------------------|--------------------------------------------------------------------------------------------------------|
-| `/sync-upstream`  | Yes                    | Merges upstream and pushes a working branch by default. `--report` produces the divergence audit only. |
+| `/upstream-sync`  | Yes                    | Merges upstream and pushes a working branch by default. `--report` produces the divergence audit only. |
 
 ### Pure reports
 
@@ -111,9 +111,9 @@ Every user-invocable skill that takes arguments uses these headings in this orde
 
 A skill with no argument surface (such as `/deploy-check`) does not carry a `## Arguments` section. Its description states the classification ("pure report") so an operator can predict the behavior from the catalog entry alone.
 
-## Worked example: sync-upstream
+## Worked example: upstream-sync
 
-`/sync-upstream` mutates by default. It operates on a single fixed target (the configured `jumpstart-pro` remote merged into the project's primary branch), so the `<path>`/`<glob>` and `all` rows in the core scope vocabulary are accepted as no-ops for family consistency. The skill genuinely understands the `--report` row.
+`/upstream-sync` mutates by default. It operates on a single fixed target (the configured `jumpstart-pro` remote merged into the project's primary branch), so the `<path>`/`<glob>` and `all` rows in the core scope vocabulary are accepted as no-ops for family consistency. The skill genuinely understands the `--report` row.
 
 ```markdown
 ## Arguments
@@ -154,7 +154,7 @@ The default of `(no argument)` is "changed lines in tracked files" for skills th
 - Operate on the entire default target.
 - Stop and report that no targets were found.
 
-`/sync-upstream` does not derive scope from a diff and does not need this fallback, but it does refuse to run outside a git worktree (and outside a worktree with the `jumpstart-pro` remote configured) for unrelated reasons. The skill's body documents that refusal.
+`/upstream-sync` does not derive scope from a diff and does not need this fallback, but it does refuse to run outside a git worktree (and outside a worktree with the `jumpstart-pro` remote configured) for unrelated reasons. The skill's body documents that refusal.
 
 ### `all` widens; the unit varies
 

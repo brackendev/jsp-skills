@@ -41,7 +41,7 @@ Use this agent automatically when user intent includes:
 🚫 **Payment webhooks** → billing-specialist
 🚫 **Authorization policies** → multi-tenancy-specialist (Pundit policies)
 🚫 **Deployment/server config** → deployment-specialist
-🚫 **Security audits** → security-auditor
+🚫 **Security audits** → security-specialist
 
 **Integration Checklist:**
 

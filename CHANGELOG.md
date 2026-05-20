@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-20
+
+### Changed
+
+- The `sync-upstream` skill is renamed to `upstream-sync` to adopt the noun-first canonical naming pattern (`<target>-<verb>`) shared across the agent-skills family. Operators with a saved `/jsp-skills:sync-upstream` invocation should replace it with `/upstream-sync`. The OpenCode permission key and OpenAI runtime display name follow the rename.
+- The `security-auditor` skill is renamed to `security-specialist` so the auto-triggered specialists share a consistent suffix (`api-specialist`, `billing-specialist`, `database-specialist`, `deployment-specialist`, `hotwire-specialist`, `multi-tenancy-specialist`, `security-specialist`). All sibling-skill cross-references are updated.
+- Documented slash commands drop the `jsp-skills:` namespace prefix. The `README.md` quick-start, skill headings, and embedded usage examples now use bare slash commands (`/upstream-sync`, `/deploy-check`). The OpenCode permission keys in `opencode.jsonc` were already bare names; the change is documentation only for operators who invoke the skills from a slash menu.
+
 ## [0.1.6] - 2026-05-18
 
 ### Added
