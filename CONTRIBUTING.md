@@ -12,6 +12,7 @@ For people working on the plugin source. End-user install instructions live in [
 | `opencode.jsonc`, `.opencode/package.json` | Local OpenCode configuration. |
 | `README.md` | End-user documentation. |
 | `CHANGELOG.md` | User-facing changes per version. |
+| `CONVENTIONS.md` | Canonical argument grammar, scope vocabulary, and mutation defaults for every user-invocable skill. |
 | `CLAUDE.md`, `TODO.md` | Local working notes. Gitignored globally; never committed. |
 
 ## APM lockfile rule
@@ -20,12 +21,11 @@ Do not add `.claude-plugin/`, `.codex-plugin/`, `.agents/plugins/marketplace.jso
 
 ## Adding or modifying a skill
 
-For user-invocable skills, read [CONVENTIONS.md](CONVENTIONS.md) first. It defines the argument grammar, scope vocabulary, mutation-versus-report classification, and section structure every user-invocable skill follows, and includes an author checklist.
-
 1. Edit `.apm/skills/<name>/SKILL.md`.
 2. Mirror the change to `.opencode/skills/<name>/SKILL.md` (byte-identical).
 3. Update `README.md` if the change is user-facing.
 4. Add a `CHANGELOG.md` entry under `[Unreleased]` for user-facing changes.
+5. Increment the `version` field in `apm.yml`.
 
 Verify the mirror is in sync:
 
@@ -51,3 +51,14 @@ Runtime install (requires `apm` and the runtime CLIs you want to verify: `claude
 - Run `apm install`, `apm update`, and `apm uninstall` in a clean temporary project. Pre-create the runtime roots: `.agents/`, `.claude/`, `.cursor/`, `.opencode/`, `.gemini/`, `.github/`, `.windsurf/`.
 - Exercise user-scope with `apm install brackendev/jsp-skills -g [--target ...]` and `apm uninstall brackendev/jsp-skills -g`. A local filesystem path (`apm install /absolute/path -g`) is also accepted.
 - Confirm OpenCode deployment with `opencode --pure debug skill`, which lists deployed skills and their source paths.
+
+## Skill conventions
+
+For the argument grammar, scope vocabulary, and mutation defaults that every user-invocable skill follows, see [CONVENTIONS.md](CONVENTIONS.md).
+
+| Setting | When to use |
+|---------|-------------|
+| `user-invocable: true`, `disable-model-invocation: true` | User-only slash command (for example `upstream-sync`, `deploy-check`). |
+| `user-invocable: false` (or omitted) | Model-invoked from conversation context (for example `security-specialist`, `migration-safety`). |
+
+Every skill carries `agents/openai.yaml` whose `policy.allow_implicit_invocation` matches the table above (`true` for model-invoked, `false` for user-only).

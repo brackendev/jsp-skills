@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-05-20
+
+### Changed
+
+- `CONTRIBUTING.md` is aligned to the family-wide structural template (Layout / APM lockfile rule / Adding or modifying a skill / Validation / Skill conventions). A `CONVENTIONS.md` row is added to the Layout table, the "Adding or modifying a skill" procedure now ends with an explicit version-bump step, and a new Skill conventions section documents the user-invocable / model-invocable distinction with package-specific example skills.
+
 ## [0.1.7] - 2026-05-20
 
 ### Changed
