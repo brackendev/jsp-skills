@@ -1,6 +1,6 @@
 ---
 name: account-scoping
-description: Multi-tenancy checklist that MUST activate when user mentions "create model", "new controller", "add resource", "scaffold", "rails g model", "rails g controller", "rails g resource", "rails g scaffold", "generate model", "build controller", "background job", or any Rails resource generation. Prevents tenant isolation bugs. Activates proactively whenever new Rails resources are discussed.
+description: "Multi-tenancy checklist that MUST activate when user mentions "create model", "new controller", "add resource", "scaffold", "rails g model", "rails g controller", "rails g resource", "rails g scaffold", "generate model", "build controller", "background job", or any Rails resource generation. Prevents tenant isolation bugs. Activates proactively whenever new Rails resources are discussed."
 allowed-tools: Read, Grep, Glob
 user-invocable: false
 ---

@@ -1,6 +1,6 @@
 ---
 name: security-specialist
-description: Performs comprehensive security audits. Activate for tasks involving security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, or Rails security best practices. Use proactively before merging significant changes, when security concerns arise, or when reviewing authentication/authorization code.
+description: "Performs comprehensive security audits. Activate for tasks involving security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, or Rails security best practices. Use proactively before merging significant changes, when security concerns arise, or when reviewing authentication/authorization code."
 allowed-tools: Read, Grep, Glob, Bash
 ---
 

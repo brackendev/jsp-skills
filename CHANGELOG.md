@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-05-26
+
+### Fixed
+
+- Quote the YAML `description` frontmatter in all skills that had unquoted values. Prevents potential YAML misinterpretation of special characters in description values.
+
 ## [0.1.8] - 2026-05-20
 
 ### Changed

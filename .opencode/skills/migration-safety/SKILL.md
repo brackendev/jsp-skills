@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: Migration review checklist that MUST activate when user mentions "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", or "database migration". Reviews for zero-downtime patterns, index requirements, and rollback safety. Activates proactively for all migration work.
+description: "Migration review checklist that MUST activate when user mentions "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", or "database migration". Reviews for zero-downtime patterns, index requirements, and rollback safety. Activates proactively for all migration work."
 allowed-tools: Read, Grep, Glob
 user-invocable: false
 ---
