@@ -75,7 +75,7 @@ Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes;
    comm -13 /tmp/jsp-sync-project-changes.txt /tmp/jsp-sync-upstream-changes.txt > /tmp/jsp-sync-upstream-only.txt
    ```
 
-   Filter the both-changed list to the paths that will actually need review (excluding paths the project-owned policy will overwrite back to the project version):
+   Filter the both-changed list to the paths that will actually need review (excluding paths handled automatically by policy, either restored to the project version or removed from the merge result):
 
    ```bash
    grep -Ev '^(app/|test/|README\.md$|CLAUDE\.md$|AGENTS\.md$|\.claude/|\.cursor/|Makefile$|compose\.yaml$|Dockerfile\.dev$|\.github/|docs/|templates/|UPGRADE\.md$|Gemfile$|Gemfile\.lock$|config/jumpstart\.yml$)' /tmp/jsp-sync-both-changed.txt > /tmp/jsp-sync-both-changed-needs-review.txt || true
@@ -102,9 +102,15 @@ Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes;
 
     ```bash
     git restore --source=HEAD --staged --worktree -- \
-      app/ test/ README.md CLAUDE.md AGENTS.md .claude/ .cursor/ Makefile \
+      app/ test/ README.md .claude/ .cursor/ Makefile \
       compose.yaml Dockerfile.dev .github/ docs/ templates/ UPGRADE.md \
       Gemfile Gemfile.lock
+    ```
+
+    Strip `CLAUDE.md` and `AGENTS.md` from the merge result entirely. The downstream project does not track these files, and neither the project version nor the upstream version should survive the merge.
+
+    ```bash
+    git rm -f --ignore-unmatch -- CLAUDE.md AGENTS.md
     ```
 
     `test/seeds/` is restored as part of `test/`. `config/jumpstart.yml` is resolved in step 13.
@@ -139,12 +145,13 @@ Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes;
 
 15. **Verify the no-clobber invariant**:
 
-    Confirm that no path the project changed (but upstream did not) was modified by the merge process. After step 12, every path in `/tmp/jsp-sync-project-only.txt` should be byte-identical to the project's `HEAD`.
+    Confirm that no path the project changed (but upstream did not) was modified by the merge process. After step 12, every path in `/tmp/jsp-sync-project-only.txt` should be byte-identical to the project's `HEAD`, except for excluded paths (`CLAUDE.md`, `AGENTS.md`) which are intentionally deleted by step 12.
 
     ```bash
     : > /tmp/jsp-sync-clobbered.txt
     while read -r path; do
       [ -z "$path" ] && continue
+      case "$path" in CLAUDE.md|AGENTS.md) continue ;; esac
       if ! git diff --quiet HEAD -- "$path" 2>/dev/null \
          || ! git diff --cached --quiet HEAD -- "$path" 2>/dev/null; then
         echo "$path" >> /tmp/jsp-sync-clobbered.txt
@@ -161,12 +168,13 @@ Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes;
     - `### Upstream changes applied` — count of paths in `/tmp/jsp-sync-upstream-only.txt`. List the first 30 paths and add "and N more" if longer.
     - `### Project changes preserved` — count of paths in `/tmp/jsp-sync-project-only.txt`. Confirm the no-clobber invariant held.
     - `### Both-changed paths requiring review` — contents of `/tmp/jsp-sync-both-changed-needs-review.txt`. Add: "Git auto-merged or the conflicts were resolved manually. Review each path before approving the PR."
-    - `### Both-changed paths covered by project-owned policy` — contents of `/tmp/jsp-sync-both-changed.txt` minus the "needs review" subset. Add: "These paths were restored to the project version by the project-owned policy; no review required."
-    - `### Upstream additions not applied to project-owned paths` — new files upstream added under `CLAUDE.md AGENTS.md .claude/ Makefile compose.yaml Dockerfile.dev .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml`. Compute with:
+    - `### Both-changed paths covered by project-owned policy` — contents of `/tmp/jsp-sync-both-changed.txt` minus the "needs review" subset, minus excluded paths (`CLAUDE.md`, `AGENTS.md`). Add: "These paths were restored to the project version by the project-owned policy; no review required."
+    - `### Excluded paths removed from merge result` — list any of `CLAUDE.md`, `AGENTS.md` that appeared in `/tmp/jsp-sync-both-changed.txt` or `/tmp/jsp-sync-upstream-only.txt`. Add: "These agent-instruction files are excluded from the merge result unconditionally. Neither the project version nor the upstream version is retained."
+    - `### Upstream additions not applied to project-owned paths` — new files upstream added under `.claude/ Makefile compose.yaml Dockerfile.dev .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml`. Compute with:
 
       ```bash
       git diff --name-only --diff-filter=A "$MERGE_BASE"...jumpstart-pro/main -- \
-        CLAUDE.md AGENTS.md .claude/ Makefile compose.yaml Dockerfile.dev \
+        .claude/ Makefile compose.yaml Dockerfile.dev \
         .github/ docs/ templates/ test/seeds/ README.md config/jumpstart.yml
       ```
 
@@ -217,7 +225,8 @@ Intermediate scratch files matching `/tmp/jsp-sync-*` are written in both modes;
 | `app/` | Project owns. Upstream should not add files here; upstream framework additions belong under `lib/jumpstart/app/`. |
 | `lib/jumpstart/app/` | Upstream owns. Framework engine overrides flow in through the divergence audit. Project edits here are drift and should move to overrides under `app/`. |
 | `test/` (including `test/seeds/`) | Project owns |
-| `README.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/` | Project owns |
+| `README.md`, `.claude/` | Project owns |
+| `CLAUDE.md`, `AGENTS.md` | Excluded. Stripped from the merge result by `git rm` in step 12. Neither the project version nor the upstream version survives the merge. |
 | `Makefile`, `compose.yaml`, `Dockerfile.dev`, `.github/` | Project owns |
 | `docs/`, `templates/` | Project owns |
 | `config/jumpstart.yml` | Project owns |

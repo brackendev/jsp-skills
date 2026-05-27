@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-05-28
+
+### Changed
+
+- The `upstream-sync` skill excludes `CLAUDE.md` and `AGENTS.md` from the merge result entirely. Previously these files were restored to the project version during the merge. Now `git rm` removes them unconditionally so neither the project version nor the upstream version survives. The step 8 divergence filter, step 15 no-clobber check, and step 16 divergence report are updated to reflect the new "excluded" treatment. The path policy table documents the change.
+
 ## [0.1.9] - 2026-05-26
 
 ### Fixed
