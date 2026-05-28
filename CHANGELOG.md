@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-05-28
+
+### Added
+
+- `CONVENTIONS.md` gains Rule 4: vendored and generated paths are excluded by default from mutating skills that walk the workspace. Two filters apply together (`.gitignore` matches plus a hardcoded floor of dependency directories, build outputs, and lock files). The override rides on Rule 1's existing `<path>` `<glob>` grammar; no new flag is introduced. The Author checklist gains a matching item. No skill in this plugin discovers candidate files from the workspace today: `/upstream-sync` is exempt because its target set is defined by upstream template reconciliation, and `/deploy-check` is a pure report. The rule is recorded so any future user-invocable mutating skill honors the same contract as its companion packages.
+
 ## [0.1.10] - 2026-05-28
 
 ### Changed

@@ -77,6 +77,37 @@ Only the exact token `--report` enables the report-only mode. Natural-language p
 
 This rule exists to prevent accidental report-mode invocation that an operator expected to mutate.
 
+## Rule 4: vendored and generated paths are excluded by default
+
+A mutating skill that walks the workspace excludes vendored, generated, and dependency-locked paths from its scope. The operator opts back in per file by naming the path explicitly. No new `--name` flag is introduced; the override rides on Rule 1's `<path>` `<glob>` row.
+
+The boundary statement: Rule 4 applies to mutating skills that discover candidate files from the workspace. It does not apply to skills whose target set is defined by an explicit project operation, template, dependency model, git operation, or named path argument.
+
+### Exclusion set
+
+Two filters apply together. A path that matches either filter is excluded.
+
+1. `.gitignore`-matched paths. Anything excluded by the project's `.gitignore`, `.git/info/exclude`, or the global excludes file is out of scope. Resolve membership with `git check-ignore -v -- <path>`.
+2. Hardcoded floor (excluded even when the project tracks the path):
+
+   | Category | Patterns |
+   |----------|----------|
+   | Dependency directories | `node_modules/`, `vendor/`, `third_party/`, `.bundle/` |
+   | Build outputs | `target/`, `build/`, `dist/`, `out/`, `.shadow-cljs/`, `cljd-out/` |
+   | Lock files | `*.lock`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Gemfile.lock`, `Cargo.lock`, `poetry.lock`, `composer.lock` |
+
+### Override
+
+When the operator names a vendored or generated file in the arguments through the `<path>` `<glob>` row, the filter does not apply to that target. Naming the path directly is treated as informed consent. The filter remains active for broad scopes: `(no argument)`, `all`, or a directory whose contents include vendored sub-paths.
+
+### Reporting
+
+The skill includes a single "skipped N vendored or generated paths" line in its results when the filter excluded any path. Under `--report`, the skill emits the full list so the operator can audit scope.
+
+### Scope of Rule 4 in this plugin
+
+No skill in this plugin discovers candidate files from the workspace today. `/upstream-sync` is exempt because its target set is defined by upstream template reconciliation: the skill merges from a named `jumpstart-pro` remote and applies the project's no-clobber policy over the result, rather than walking the workspace for files to edit. `/deploy-check` is a pure report and is out of scope. The rule is recorded here so any future user-invocable mutating skill in this plugin honors the same contract as its companion packages.
+
 ## Skill classification
 
 Every user-invocable skill falls into one of two categories. The category determines whether the skill needs a `--report` flag.
@@ -175,6 +206,7 @@ Before merging a new or modified user-invocable skill, the author confirms:
 - The skill is classified explicitly as a mutating skill or a pure report in its description.
 - Mutating skills that benefit from a preview mode include a `--report` row in the Arguments table and apply changes only when the literal token is absent.
 - The command verb implies the default behavior. A skill named `/sync-*`, `/fix-*`, `/commit`, `/prune-*`, or `/rebuild-*` should mutate by default; the name promises action. A skill named `/*-check` or other report-suggestive names should not mutate the project.
+- Mutating skills that walk the workspace include a one-line Rule 4 reference in their `## Mutation` or `## Scope` section. Skills whose target set is defined by an explicit operation, template, dependency model, git operation, or named path (such as `/upstream-sync`) are exempt and carry no reference.
 - The mirror at `.opencode/skills/<name>/SKILL.md` is byte-identical to `.apm/skills/<name>/SKILL.md`.
 - The frontmatter `name` field matches the skill's directory name in both the canonical source and the mirror.
 - `CHANGELOG.md` records the change under `[Unreleased]` when the change is user-facing.
