@@ -40,6 +40,15 @@ Run pre-deployment checks before a production release:
 
 The remaining skills (account scoping, migration safety, billing, Hotwire, and the rest) activate automatically when their domain comes up. They cannot be invoked directly.
 
+## Command guide
+
+A quick guide to every slash command. The detailed entries under [Skills](#skills) cover arguments and examples.
+
+| Command | Use it when | What it does |
+|---------|-------------------|--------------|
+| `/upstream-sync` | Jumpstart Pro Rails upstream has new changes | Merges upstream while protecting project customizations and writes a sync-audit report |
+| `/deploy-check` | Before a production release | Runs a pre-deployment verification checklist (report only) |
+
 ## Skills
 
 ### User-invocable
