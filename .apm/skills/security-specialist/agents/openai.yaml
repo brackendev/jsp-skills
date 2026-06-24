@@ -1,6 +1,6 @@
 interface:
   display_name: "Security Specialist"
-  short_description: "Comprehensive security audits."
+  short_description: "Jumpstart Pro security review."
   default_prompt: "Use security-specialist for a security review."
   brand_color: "#D14"
 

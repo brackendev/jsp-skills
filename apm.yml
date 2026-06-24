@@ -1,6 +1,6 @@
 name: jsp-skills
-version: 0.1.12
-description: Jumpstart Pro Rails toolkit for multi-tenancy, billing, Hotwire, migrations, and deployment.
+version: 0.1.13
+description: Jumpstart Pro Rails skills for multi-tenancy, billing, deployment, and upstream synchronization, complementing 37signals-skills.
 author: Bracken Spencer
 license: MIT
 target: all

@@ -1,10 +1,18 @@
 # jsp-skills
 
-[Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, Hotwire, migrations, and deployment to every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, Windsurf, and Kiro.
+[Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, deployment, and upstream synchronization to every runtime APM supports: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, Windsurf, and Kiro. They complement [37signals-skills](https://github.com/marckohlbrugge/37signals-skills), which teaches general Rails conventions.
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/upstream-sync`, `/deploy-check`); the rest activate automatically from conversation context. Argument grammar, scope vocabulary, and the `--report` convention are documented in [CONVENTIONS.md](CONVENTIONS.md).
 
 Source: <https://github.com/brackendev/jsp-skills>. APM shorthand: `brackendev/jsp-skills`.
+
+## Recommended companion
+
+These skills focus on Jumpstart Pro specifics: account-based multi-tenancy, Pay billing, Kamal deployment, the Docker and Make development environment, and upstream synchronization. They complement [37signals-skills](https://github.com/marckohlbrugge/37signals-skills), which teaches general Rails conventions in the 37signals style. Installing both is recommended: 37signals-skills supplies the broad Rails guidance, and jsp-skills adds the Jumpstart Pro layer.
+
+When both are installed, jsp-skills takes precedence inside a Jumpstart Pro application. Each skill resolves implementation choices in this order: the application's own code and dependencies first, then the Jumpstart Pro patterns, then general Rails guidance from a companion package, then conventional Rails defaults. Two differences matter, because Jumpstart Pro departs from some general Rails conventions. Authentication uses Devise rather than a custom Identity, Session, and User flow. Billing, authorization, and tenancy run through the gems Jumpstart Pro ships (Pay, Pundit, and acts_as_tenant) rather than hand-written equivalents.
+
+jsp-skills also works on its own. It keeps a compact safety floor for migrations, security, and webhooks, so nothing critical is lost when it is installed without a companion.
 
 ## Install
 
@@ -88,17 +96,17 @@ These activate from conversation context. They cannot be invoked directly.
 
 ### Specialists
 
-Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for each area and coordinate with each other (for example, `hotwire-specialist` defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`).
+Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for each area and coordinate with each other (for example, `hotwire-specialist` defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`). They focus on Jumpstart Pro specifics and defer general Rails technique to a companion package such as [37signals-skills](https://github.com/marckohlbrugge/37signals-skills).
 
 | Skill | Activates on |
 |-------|--------------|
-| `api-specialist` | API endpoints, JWT authentication, OAuth flows, external API integrations, webhook handlers (non-payment) |
+| `api-specialist` | Jumpstart Pro API endpoints, ApiToken authentication, account scoping, Hotwire Native sessions, the ApplicationClient pattern, non-payment webhooks |
 | `billing-specialist` | Subscriptions, payment processors (Stripe, Paddle, Braintree), payment webhooks, plan gating, per-seat pricing, one-time payments, dunning |
-| `database-specialist` | Schema changes, migrations, indexes, multi-database configuration, database seeding, query performance, data integrity |
+| `database-specialist` | Multi-database configuration (SolidQueue, SolidCache, SolidCable), account-scoped schema and data migrations, the Pay billing schema, Jumpstart Pro database commands |
 | `deployment-specialist` | Production deployments, server management, rollbacks, deployment troubleshooting, infrastructure configuration |
-| `hotwire-specialist` | Turbo Frames/Streams, Stimulus controllers, TailwindCSS styling, View Components, Import Maps, interactive UI features |
+| `hotwire-specialist` | Jumpstart Pro Hotwire wiring (Import Maps, bundled Stimulus components, View Components), account-scoped Turbo Stream broadcasts, Jest tests for Stimulus controllers |
 | `multi-tenancy-specialist` | Account scoping, `Current.account` patterns, AccountRecord inheritance, Pundit policies, tenant isolation queries, account switching, impersonation |
-| `security-specialist` | Security reviews, multi-tenancy isolation checks, authorization audits, sensitive data handling, Rails security best practices |
+| `security-specialist` | Jumpstart Pro security review: tenant isolation, Pundit authorization, impersonation and billing guards, Pay webhook security, account-scoped data access |
 
 ## Contributing
 

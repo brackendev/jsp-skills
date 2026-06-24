@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-06-24
+
+### Added
+
+- The `README.md` documents the relationship to [37signals-skills](https://github.com/marckohlbrugge/37signals-skills) and recommends installing it as a companion. The new "Recommended companion" section explains that these skills focus on Jumpstart Pro specifics, that 37signals-skills supplies general Rails conventions, and that jsp-skills takes precedence inside a Jumpstart Pro application. It records the precedence order and the two divergences operators should know about: Jumpstart Pro authenticates with Devise rather than a custom Identity, Session, and User flow, and it relies on the Pay, Pundit, and acts_as_tenant gems rather than hand-written equivalents.
+
+### Changed
+
+- The `api-specialist`, `database-specialist`, `hotwire-specialist`, `migration-safety`, and `security-specialist` skills are re-scoped to Jumpstart Pro specifics. They no longer repeat general Rails technique (generic Turbo and Stimulus, REST and OAuth, PostgreSQL indexing and query optimization, and broad OWASP guidance) and defer it to a companion package. Each now states a precedence order and keeps a compact safety floor so standalone installs stay safe: staged migrations and concurrent indexes; authentication, authorization, tenant isolation, and cross-site request forgery protection; and webhook signature verification, idempotency, and replay handling.
+- The `api-specialist`, `security-specialist`, `multi-tenancy-specialist`, and `billing-specialist` skills gain explicit callouts where Jumpstart Pro departs from general Rails conventions: authentication is Devise, tenant context is `Current.account` with `acts_as_tenant`, and billing runs through the Pay gem.
+- The `account-scoping` skill is reduced to a fast generation checklist that defers the deeper multi-tenancy patterns to `multi-tenancy-specialist`. Its background-job example is corrected to place `account_id` first and wrap work in `AccountRecord.with_account`.
+- The package description in `apm.yml`, the README introduction, and the per-skill OpenAI display descriptions are updated to reflect the Jumpstart Pro focus and the companion relationship.
+
 ## [0.1.12] - 2026-06-15
 
 ### Changed

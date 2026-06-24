@@ -1,6 +1,6 @@
 interface:
   display_name: "Hotwire Specialist"
-  short_description: "Hotwire (Turbo + Stimulus) frontend work."
+  short_description: "Jumpstart Pro Hotwire wiring and Stimulus tests."
   default_prompt: "Use hotwire-specialist for Turbo and Stimulus."
   brand_color: "#D14"
 

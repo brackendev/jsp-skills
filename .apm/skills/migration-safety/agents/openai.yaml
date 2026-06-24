@@ -1,6 +1,6 @@
 interface:
   display_name: "Migration Safety"
-  short_description: "Reviews migrations for zero-downtime patterns."
+  short_description: "Account scoping and a zero-downtime safety floor for migrations."
   default_prompt: "Use migration-safety to review this migration."
   brand_color: "#D14"
 

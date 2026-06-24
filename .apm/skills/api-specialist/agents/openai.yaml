@@ -1,6 +1,6 @@
 interface:
   display_name: "API Specialist"
-  short_description: "API v1 development and token authentication."
+  short_description: "Jumpstart Pro API endpoints and token authentication."
   default_prompt: "Use api-specialist for API design help."
   brand_color: "#D14"
 

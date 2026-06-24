@@ -1,6 +1,6 @@
 interface:
   display_name: "Database Specialist"
-  short_description: "PostgreSQL migrations and multi-database setup."
+  short_description: "Multi-database setup, account-scoped schema, and the Pay billing schema."
   default_prompt: "Use database-specialist for schema work."
   brand_color: "#D14"
 
