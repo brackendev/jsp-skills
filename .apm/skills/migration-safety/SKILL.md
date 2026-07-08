@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: "Jumpstart Pro migration safety checklist that MUST activate when user mentions "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", or "database migration". Enforces account:references on tenant tables and a zero-downtime safety floor. Activates proactively for all migration work."
+description: 'Jumpstart Pro migration safety checklist that MUST activate when user mentions "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", or "database migration". Enforces account:references on tenant tables and a zero-downtime safety floor. Activates proactively for all migration work.'
 allowed-tools: Read, Grep, Glob
 user-invocable: false
 ---

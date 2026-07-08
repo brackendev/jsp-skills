@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-07-08
+
+### Fixed
+
+- The `deploy-check` command description no longer claims it makes no changes. Step 1 runs `make verify`, which rebuilds the local environment and runs the full test suite, so the description now reflects that.
+- The `account-scoping`, `migration-safety`, and `troubleshooting` skills had invalid YAML frontmatter caused by unescaped quotation marks in the `description`, which could prevent their metadata from loading under a strict parser. The descriptions are now correctly quoted.
+
 ## [0.1.13] - 2026-06-24
 
 ### Added

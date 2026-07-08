@@ -1,6 +1,6 @@
 ---
 name: troubleshooting
-description: "Development environment diagnostics guide that MUST activate when user mentions "Docker error", "container won't start", "SSL certificate", "make setup failed", "port already in use", "permission denied", "can't connect to database", or describes Docker/SSL/Make/container-specific issues. Provides first-line triage for infrastructure problems. Activates proactively for development environment issues."
+description: "Development environment diagnostics guide that MUST activate when user mentions \"Docker error\", \"container won't start\", \"SSL certificate\", \"make setup failed\", \"port already in use\", \"permission denied\", \"can't connect to database\", or describes Docker/SSL/Make/container-specific issues. Provides first-line triage for infrastructure problems. Activates proactively for development environment issues."
 allowed-tools: Read, Grep, Bash, AskUserQuestion
 user-invocable: false
 ---

@@ -1,6 +1,6 @@
 ---
 name: deploy-check
-description: "Pure report. Pre-deployment verification checklist before production release. Produces a go/no-go with evidence and makes no changes to the project."
+description: "Pre-deployment readiness checklist for production. Runs environment verification (make verify rebuilds the local environment and runs the full test suite), migration safety review, and credential and dependency checks, then produces a go/no-go with evidence."
 allowed-tools: Read, Bash
 user-invocable: true
 disable-model-invocation: true
