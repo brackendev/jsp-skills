@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-07-29
+
+### Removed
+
+- The package manifest no longer declares the top-level `target: all` field. The APM manifest schema deprecates the `all` value: a parser treats the field as though it were absent and falls through to the `--target` flag or filesystem auto-detection, and the value is scheduled to become a hard parse error in a future APM release. Removing the field makes that fall-through behavior permanent. Installation behavior is unchanged, because APM already resolved targets by auto-detection rather than from this field. The separate `compilation.target` setting is not affected.
+
 ## [0.1.14] - 2026-07-08
 
 ### Fixed
@@ -124,7 +130,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The post-merge `README-FORK.md` preservation step from the `sync` skill. With `README.md` project-owned, a committed copy of the upstream README would only create a stale artifact.
 - Hardcoded references to the prior Tier 2 fork repository from the `account-scoping` and `troubleshooting` skills.
 
-## [0.1.0]
+## [0.1.0] - 2026-05-10
 
 ### Added
 
