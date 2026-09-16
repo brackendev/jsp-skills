@@ -1,6 +1,6 @@
 # jsp-skills
 
-[Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, deployment, and upstream synchronization to every runtime in APM's default target set: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, Windsurf, and Kiro. Antigravity is supported by naming it explicitly with `--target antigravity`. They complement [37signals-skills](https://github.com/marckohlbrugge/37signals-skills), which teaches general Rails conventions.
+[Jumpstart Pro Rails](https://jumpstartrails.com/) toolkit packaged as an [APM](https://github.com/microsoft/apm) plugin. One install deploys skills for multi-tenancy, billing, deployment, and upstream synchronization to every runtime in APM's default target set: Claude Code, Codex, OpenCode, Cursor, Copilot, Gemini, Windsurf, Kiro, and Grok Build. Antigravity is supported by naming it explicitly with `--target antigravity`. They complement [37signals-skills](https://github.com/marckohlbrugge/37signals-skills), which teaches general Rails conventions.
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard. Two appear as slash commands (`/upstream-sync`, `/deploy-check`); the rest activate automatically from conversation context. Argument grammar, scope vocabulary, and the `--report` convention are documented in [CONVENTIONS.md](CONVENTIONS.md).
 
