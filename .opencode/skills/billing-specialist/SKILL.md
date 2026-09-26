@@ -11,19 +11,7 @@ This skill carries Jumpstart Pro-specific billing guidance. Resolve choices in t
 
 Billing runs through the Pay gem and its processor integrations. Do not hand-roll subscription, charge, or customer models, and do not call a payment processor API directly where Pay already provides the operation. Account billing is scoped through the account's `payment_processor`.
 
-## Proactive Activation Triggers
-
-Use this agent automatically when user intent includes:
-- Implementing subscription plans or billing features
-- Integrating payment processors (Stripe, Paddle, Braintree)
-- Setting up payment webhooks or handling webhook events
-- Implementing per-seat pricing for team accounts
-- Building one-time payment or checkout flows
-- Adding plan gating or feature restrictions
-- Debugging payment failures or subscription issues
-- Implementing dunning workflows for failed payments
-
-## When to Use This Agent
+## When to use this skill
 
 ✅ **Subscription billing** (Pay gem integration, all processors)
 ✅ **Payment processor webhooks** (Stripe, Paddle Billing, Paddle Classic, Braintree)
@@ -38,115 +26,22 @@ Use this agent automatically when user intent includes:
 
 ## Fetching current library documentation
 
-**Before implementing payment processor features, fetch current documentation so the code reflects the latest API.** Use whichever documentation lookup the host runtime provides. Common options: an installed Context7 MCP server, the runtime's built-in web search, or a project-local documentation source. The library IDs and topics below assume Context7's `resolve-library-id` and `get-library-docs` workflow; adapt them to the mechanism available.
+Payment processor APIs, webhook payloads, and Pay gem behavior change between versions, so fetch current documentation for the processor and the Pay gem before implementing processor-specific features (webhook handlers, processor integrations, payment methods, per-seat or metered billing). Use the lookup the host runtime provides: a Context7 MCP server (`resolve-library-id`, then `query-docs`), built-in web search, or a project-local source. Known library IDs: `/stripe/stripe-ruby`, `/pay-rails/pay`, `/braintree/braintree_ruby`. Resolve Paddle Billing and any other processor by name first.
 
-**Step 1: Get documentation (use exact library IDs)**
+When the fetched documentation changes the implementation, name the source you relied on.
 
-If Context7 is available, call `get-library-docs` with these parameters. With other lookup mechanisms, supply the same library and topic information in the form that mechanism accepts:
-
-**Stripe:**
-```
-Library ID: /stripe/stripe-ruby
-Topics: "webhooks", "subscriptions", "checkout", "customers", "invoices"
-Tokens: 8000 (webhooks are complex, need comprehensive docs)
-```
-
-**Pay gem:**
-```
-Library ID: /pay-rails/pay
-Topics: "webhooks", "subscriptions", "stripe", "paddle"
-Tokens: 5000 (default)
-```
-
-**Paddle Billing:**
-```
-Library ID: /paddle/paddle-node
-Note: Check for Ruby SDK via resolve-library-id first
-Topics: "webhooks", "subscriptions", "transactions"
-Tokens: 8000
-```
-
-**Braintree:**
-```
-Library ID: /braintree/braintree_ruby
-Topics: "webhooks", "subscriptions", "transactions"
-Tokens: 5000
-```
-
-**Step 2: REQUIRED - Show Your Work**
-
-You MUST include this section in your response BEFORE implementing any code:
-
-```
-📚 Fetching Current Documentation
-
-Library: [exact library ID you're using]
-Topic: [specific topic]
-Tokens: [token count]
-Status: ✓ Retrieved
-
-Key findings from current docs:
-- [Brief bullet point about what you learned]
-- [Another finding]
-```
-
-**Example:**
-```
-📚 Fetching Current Documentation
-
-Library: /stripe/stripe-ruby
-Topic: webhooks
-Tokens: 8000
-Status: ✓ Retrieved
-
-Key findings from current docs:
-- checkout.session.async_payment_succeeded fires after async payment completes
-- Event structure matches checkout.session.completed payload
-- Requires handling both events for async payment methods (ACH, SEPA)
-```
-
-**If you skip this step, your response is incomplete.**
-
-**Step 3: Combine with Jumpstart Pro patterns**
-
-Use the fetched API patterns combined with the multi-tenancy and Pay gem patterns from this playbook.
-
-**When to fetch:**
-- Implementing new webhook handlers → topic: "webhooks", tokens: 8000
-- Adding processor integration → topic: "subscriptions", tokens: 5000
-- Troubleshooting specific features → topic: feature name (e.g., "metered billing")
-- Payment method handling → topic: "payment methods", tokens: 5000
-- Per-seat pricing implementation → topic: "subscriptions", tokens: 5000
-
-**When the processor is not listed above:**
-
-Look up the library ID before fetching docs. With Context7, call `resolve-library-id` with the library name, then pass the resolved ID to `get-library-docs`. With other lookup mechanisms, perform the equivalent search by library name and topic.
-
-```
-User asks: "Integrate with Lemon Squeezy"
-→ Resolve "lemon-squeezy" to its documentation ID (Context7: `resolve-library-id`)
-→ Fetch docs with the resolved ID (Context7: `get-library-docs`)
-```
-
-**Why this matters:**
-- Payment processor APIs change frequently (breaking changes, new events, deprecations)
-- Webhook payload structures evolve between versions
-- New features (pause, metered billing) have version-specific implementation requirements
-- API deprecations require migration guidance from current docs
-
-## Defer to Specialist Agents
+## Defer to other skills
 
 ❌ **Multi-tenancy scoping** → multi-tenancy-specialist (Current.account, AccountRecord.with_account)
 ❌ **Authorization policies** → multi-tenancy-specialist (Pundit, policy scoping)
-❌ **API endpoints** → api-specialist (JWT auth, API versioning)
+❌ **API endpoints** → api-specialist (ApiToken authentication, API endpoints)
 ❌ **Non-payment webhooks** → api-specialist (OAuth, general integrations)
 ❌ **Frontend billing UI** → hotwire-specialist (forms, Turbo, Stimulus)
 ❌ **Database migrations** → database-specialist (schema changes, indexes)
 ❌ **Security audits** → security-specialist (Jumpstart Pro security review)
 
-## Related Agents
+## Related skills
 
-Work closely with:
 - **multi-tenancy-specialist** for account-scoped billing and AccountRecord.with_account in jobs
 - **hotwire-specialist** for billing UI, subscription forms, and Turbo-powered dashboards
 - **api-specialist** for billing API endpoints (seat changes, subscription management)
@@ -1481,5 +1376,3 @@ end
 18. **Test multi-tenancy scoping** - Ensure account isolation
 19. **Test dunning workflows** - Verify grace periods and suspension
 20. **Mock external APIs** - Use WebMock for payment API calls
-
-You are the guardian of billing operations in this codebase. Ensure all payment processing leverages Pay gem patterns, respects multi-tenancy boundaries, and follows webhook security best practices.

@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-09-26
+
+### Changed
+
+- The `billing-specialist` skill no longer requires a fixed "Fetching Current Documentation" block before any code. It still asks for current processor and Pay gem documentation before processor-specific work, and it now names the current Context7 tools (`resolve-library-id`, then `query-docs`) instead of the retired `get-library-docs` call and its token parameter.
+- The `account-scoping`, `migration-safety`, and `troubleshooting` descriptions describe the kinds of work that trigger them instead of listing individual phrases. The README trigger table matches.
+- The `troubleshooting` skill no longer recommends `make clean` as the first step when the cause is unclear. It describes the full rebuild as destructive, asks the agent to diagnose first and confirm before running it, and asks a plain clarifying question instead of a scripted one.
+- The specialist skills no longer carry trigger lists in their bodies or refer to themselves as agents, and the closing "guardian" statements are removed.
+
+### Fixed
+
+- The `billing-specialist` and `multi-tenancy-specialist` skills described the API as using JWT authentication. They now match `api-specialist`, which uses `ApiToken` mapped to Devise users.
+- The `multi-tenancy-specialist` skill described `Api::BaseController` as skipping account resolution. It now matches `api-specialist`, where `SetCurrentAccount` sets `Current.account` from the nested route.
+- The `deployment-specialist` skill listed `REDIS_URL` as a required variable and referred to a nonexistent `database-migration-manager` agent. It now lists the SolidQueue, SolidCache, and SolidCable database URLs and refers to the `database-specialist` and `migration-safety` skills.
+- The `upstream-sync` skill now pre-approves `git rm` and `find`, which its merge and drift-detection steps run.
+- The README no longer describes `/deploy-check` as a pure report, matching the skill description corrected in 0.1.14.
+
 ## [0.1.17] - 2026-09-16
 
 ### Changed

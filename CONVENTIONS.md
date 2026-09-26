@@ -140,7 +140,7 @@ Every user-invocable skill that takes arguments uses these headings in this orde
 
 `## Customization` is retired as a section name.
 
-A skill with no argument surface (such as `/deploy-check`) does not carry a `## Arguments` section. Its description states the classification ("pure report") so an operator can predict the behavior from the catalog entry alone.
+A skill with no argument surface (such as `/deploy-check`) does not carry a `## Arguments` section. Its description states what the skill runs so an operator can predict the behavior from the catalog entry alone.
 
 ## Worked example: upstream-sync
 
@@ -166,7 +166,7 @@ The default applies the merge, the project-owned policy, the conflict resolution
 ```markdown
 ---
 name: deploy-check
-description: Pre-deployment verification checklist before production release. Pure report: produces a go/no-go with evidence. Makes no changes to the project.
+description: "Pre-deployment readiness checklist for production. Runs environment verification (make verify rebuilds the local environment and runs the full test suite), migration safety review, and credential and dependency checks, then produces a go/no-go with evidence."
 allowed-tools: Read, Bash
 user-invocable: true
 disable-model-invocation: true

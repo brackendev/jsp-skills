@@ -11,18 +11,6 @@ This skill carries Jumpstart Pro-specific multi-tenancy guidance. Resolve choice
 
 Jumpstart Pro tenancy differs from some general Rails conventions, so state the difference where it affects the task. Authentication is Devise: do not introduce a custom Identity/Session/User flow. Data isolation is row-based through `acts_as_tenant` and `Current.account`, with `AccountRecord` as the base class. The account is selected from the request (session, path, or subdomain), but isolation is enforced at the row level by `acts_as_tenant`, not by path scoping alone. Use these existing systems rather than rebuilding them.
 
-## Proactive Activation Triggers
-
-Use this agent automatically when user intent includes:
-- Creating models that store tenant data
-- Implementing controllers with account-scoped queries
-- Setting up Pundit authorization policies
-- Debugging tenant isolation or data leak issues
-- Implementing account switching or impersonation
-- Building background jobs that need account context
-- Reviewing code for multi-tenancy compliance
-- Implementing account invitations or team management
-
 ## Quick Reference
 
 | Context | Tenant Setup | Key Concern |
@@ -35,7 +23,7 @@ Use this agent automatically when user intent includes:
 | **Console/Rake** | Manually set with `AccountRecord.with_account` | Use `ActsAsTenant.fallback_tenant` for global tasks |
 | **Tests** | Use fixtures: `accounts(:one)`, `users(:account_owner)` | Switch accounts in system tests |
 
-## When to Use This Agent
+## When to use this skill
 
 ✅ **Multi-tenancy architecture** (AccountRecord, Current.account, scoping)
 ✅ **Account/team management** (invitations, switching, roles)
@@ -44,19 +32,18 @@ Use this agent automatically when user intent includes:
 ✅ **Account switching and impersonation**
 ✅ **Tenant isolation auditing**
 
-## Defer to Specialist Agents
+## Defer to other skills
 
 ❌ **Billing and subscriptions** → billing-specialist (Pay gem, payment webhooks)
 ❌ **Frontend/UI implementation** → hotwire-specialist (Turbo, Stimulus, forms)
-❌ **API endpoints** → api-specialist (JWT auth, API versioning)
+❌ **API endpoints** → api-specialist (ApiToken authentication, API endpoints)
 ❌ **Database migrations** → database-specialist (schema changes, multi-DB)
 ❌ **Production deployments** → deployment-specialist (Kamal, server operations)
 ❌ **Performance issues** → database-specialist (N+1 queries, indexes)
 ❌ **Security audits** → security-specialist (Jumpstart Pro security review)
 
-## Related Agents
+## Related skills
 
-Work closely with:
 - **billing-specialist** for account-scoped billing and subscriptions
 - **security-specialist** for multi-tenancy isolation reviews
 - **api-specialist** for account-scoped API endpoints
@@ -195,28 +182,11 @@ end
 config.session_store :cookie_store, key: '_app_session', domain: '.example.com'
 ```
 
-**API Controllers: No automatic Current.account**
+**API controllers**
 
-API endpoints are stateless and don't have sessions:
-
-```ruby
-# app/controllers/api/base_controller.rb
-class Api::BaseController < ApplicationController
-  skip_before_action :set_current_account  # No session
-
-  # Must use nested routes for scoping
-  # GET /api/v1/accounts/:account_id/projects/:id
-  def show
-    account = current_user.accounts.find(params[:account_id])
-    AccountRecord.with_account(account) do
-      @project = Project.find(params[:id])
-    end
-  end
-end
-```
+`Api::BaseController` includes `SetCurrentAccount`, which resolves the account from a nested route parameter (`/api/v1/accounts/:account_id/...`) or the user's single account, sets `Current.account`, and responds `:forbidden` when the user does not belong to that account. The `api-specialist` skill documents the stack.
 
 **IMPORTANT:** The `current_account` helper depends on `set_current_account` being called. It's NOT automatically available in:
-- API controllers (unless you `include AccountScoped` and call `set_current_account`)
 - Background jobs
 - Mailers
 - Plain Ruby service objects
@@ -618,7 +588,7 @@ class ApplicationPolicy
 end
 ```
 
-**CRITICAL:** Since `acts_as_tenant` automatically scopes AccountRecord models, policy scopes typically just return `scope.all`. The scoping happens at the model layer, not the policy layer.
+Because `acts_as_tenant` scopes AccountRecord models, policy scopes typically return `scope.all`. The scoping happens at the model layer, not the policy layer.
 
 ```ruby
 # ❌ REDUNDANT: acts_as_tenant already does this
@@ -705,7 +675,7 @@ end
 
 ## Tenant-Aware Background Jobs
 
-Background jobs must respect account scoping for multi-tenancy. **CRITICAL:** The `account_id` must ALWAYS be the first parameter.
+Tenant-scoped jobs take `account_id` as the first `perform` argument, because `Account::BaseJob` reads the account from `job.arguments.first`.
 
 ### Pattern 1: Account::BaseJob (RECOMMENDED)
 
@@ -1008,15 +978,6 @@ def download
 end
 ```
 
-### Critical Reminders
-
-- ❌ NEVER forget to set Current.account in background jobs
-- ❌ NEVER assume account context carries over automatically
-- ✅ ALWAYS pass account_id as first argument to jobs
-- ✅ ALWAYS use `with_account` or explicit Current.account assignment
-- ✅ ALWAYS clean up Current.account in ensure blocks
-- ✅ Test jobs with multiple accounts to catch scoping bugs
-
 ## Routes Organization
 
 Routes split across files in `config/routes/`:
@@ -1024,40 +985,6 @@ Routes split across files in `config/routes/`:
 - `billing.rb` - Subscriptions, payments (see billing-specialist)
 - `users.rb` - User profiles, settings, auth
 - `api.rb` - API endpoints (see api-specialist)
-
-## Development Workflow
-
-### Starting the Application
-
-This is a Docker/Make-first development environment. Start all application processes using:
-```bash
-make up
-```
-
-This starts all Docker services including the web server, PostgreSQL, Redis, and automatically runs `bin/rails tailwindcss:watch` for CSS compilation.
-
-### Docker Process Management
-
-Manage Docker services with these commands:
-
-```bash
-# Stop all services
-make down
-
-# View logs
-make logs
-
-# Access Rails console in Docker
-make console
-
-# Run Rails commands in Docker
-make rails routes
-
-# Access shell in Docker container
-make shell
-```
-
-Use `overmind connect web` to access `binding.irb` or `debugger` breakpoints in running processes.
 
 ## Common Pitfalls (Jumpstart-Specific)
 
@@ -1727,5 +1654,3 @@ Before deploying tenant-related changes:
 - [ ] Feature flags control tenant-specific features
 - [ ] Rollback tested with active account sessions
 - [ ] No irreversible cross-account data changes
-
-You are the guardian of multi-tenancy patterns in this codebase. Ensure all implementations follow tenant isolation principles and prevent data leaks between accounts.

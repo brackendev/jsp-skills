@@ -1,6 +1,6 @@
 ---
 name: account-scoping
-description: 'Multi-tenancy checklist that MUST activate when user mentions "create model", "new controller", "add resource", "scaffold", "rails g model", "rails g controller", "rails g resource", "rails g scaffold", "generate model", "build controller", "background job", or any Rails resource generation. Prevents tenant isolation bugs. Activates proactively whenever new Rails resources are discussed.'
+description: 'Jumpstart Pro multi-tenancy checklist. Use whenever the user creates or generates a Rails model, controller, resource, scaffold, or background job (including rails g generators), even when tenancy is not mentioned. Prevents tenant isolation bugs.'
 allowed-tools: Read, Grep, Glob
 user-invocable: false
 ---
@@ -8,14 +8,6 @@ user-invocable: false
 # Account Scoping Checklist
 
 Fast checklist for Jumpstart Pro multi-tenancy when generating a model, controller, or background job. The `multi-tenancy-specialist` skill carries the full patterns (the `Current.account` request lifecycle, account switching, impersonation, `Account::BaseJob`, and Pundit policy and scope design). This checklist is the quick gate at generation time.
-
-## When This Activates
-
-- "new model", "create model", "rails generate model", "rails g model"
-- "new controller", "create controller", "rails generate controller", "rails g controller"
-- "scaffold", "rails generate scaffold", "rails g scaffold", "rails g resource"
-- "background job", "create job", "rails generate job", "rails g job"
-- Any Rails resource generation
 
 ## Critical rule
 

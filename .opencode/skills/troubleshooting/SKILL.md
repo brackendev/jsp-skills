@@ -1,6 +1,6 @@
 ---
 name: troubleshooting
-description: "Development environment diagnostics guide that MUST activate when user mentions \"Docker error\", \"container won't start\", \"SSL certificate\", \"make setup failed\", \"port already in use\", \"permission denied\", \"can't connect to database\", or describes Docker/SSL/Make/container-specific issues. Provides first-line triage for infrastructure problems. Activates proactively for development environment issues."
+description: "Jumpstart Pro development environment diagnostics. Use when Docker, containers, local SSL certificates, make targets, ports, file permissions, or the local database fail, such as a container that will not start, make setup failing, or a port already in use. Provides first-line triage."
 allowed-tools: Read, Grep, Bash, AskUserQuestion
 user-invocable: false
 ---
@@ -9,35 +9,9 @@ user-invocable: false
 
 Quick diagnostics for Docker, SSL, Make, and database issues in the development environment.
 
-## When This Activates
-
-- Docker errors ("container won't start", "Docker daemon")
-- SSL certificate issues ("certificate warning", "SSL error")
-- Container/service failures ("postgres won't start", "redis connection refused")
-- Make command failures ("make setup failed", "make up failed")
-- Port conflicts ("port already in use", "address already in use")
-- Permission errors in Docker context
-
 ## Step 1: Triage the Issue
 
-**If the user's problem isn't immediately clear, ask to narrow down:**
-
-Use AskUserQuestion with:
-- header: "Issue type"
-- question: "What type of problem are you experiencing?"
-- options:
-  - label: "Docker/containers"
-    description: "Container won't start, Docker daemon errors, make up fails"
-  - label: "SSL/certificates"
-    description: "Browser warnings, certificate not found errors"
-  - label: "Database"
-    description: "Connection refused, migration failures, seed errors"
-  - label: "Tests failing"
-    description: "System tests timing out, parallel test issues"
-
-**After user responds, jump directly to the relevant section below.**
-
-If the user already specified their issue clearly (e.g., "Docker won't start"), skip the question and go directly to that section.
+If the report does not make the problem area clear, ask the user whether it involves Docker and containers, SSL certificates, the database, or failing tests, then continue in that section.
 
 ---
 
@@ -52,17 +26,15 @@ If the user already specified their issue clearly (e.g., "Docker won't start"), 
 | Port already in use | `lsof -i :3001` → `kill -9 <PID>` | [Ports](#port-issues) |
 | Permission denied | `chmod -R 777 log tmp` | [Permissions](#permission-issues) |
 
-## The 80% Fix
+## Full rebuild
 
-**When in doubt, try this first:**
+A clean rebuild resolves most environment problems, but `make clean` destroys the local containers and development data. Diagnose with the sections below first, and confirm with the user before running it:
 
 ```bash
 make clean
 make build ARGS="--no-cache"
 make setup
 ```
-
-This destroys the environment and rebuilds from scratch. Fixes most issues.
 
 ---
 
@@ -390,7 +362,7 @@ cat .env
 make exec ARGS="env | grep -E '(RAILS|DATABASE|REDIS|SSL)'"
 ```
 
-**4. Try the 80% fix:**
+**4. Offer the full rebuild (confirm first, since it deletes local data):**
 ```bash
 make clean
 make build ARGS="--no-cache"

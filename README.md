@@ -55,7 +55,7 @@ A quick guide to every slash command. The detailed entries under [Skills](#skill
 | Command | Use it when | What it does |
 |---------|-------------------|--------------|
 | `/upstream-sync` | Jumpstart Pro Rails upstream has new changes | Merges upstream while protecting project customizations and writes a sync-audit report |
-| `/deploy-check` | Before a production release | Runs a pre-deployment verification checklist (report only) |
+| `/deploy-check` | Before a production release | Runs a pre-deployment readiness checklist and produces a go/no-go |
 
 ## Skills
 
@@ -82,7 +82,7 @@ The full path policy and step-by-step procedure live in `.apm/skills/upstream-sy
 
 #### `/deploy-check`
 
-Pure report. Pre-deployment verification checklist before a production release.
+Pre-deployment readiness checklist for a production release. It runs `make verify`, which rebuilds the local environment and runs the full test suite, then reviews migrations, credentials, and dependencies and produces a go/no-go with evidence. It makes no changes to project files.
 
 ### Auto-triggered
 
@@ -90,9 +90,9 @@ These activate from conversation context. They cannot be invoked directly.
 
 | Skill | Triggers |
 |-------|----------|
-| `account-scoping` | "create model", "new controller", "add resource", "scaffold", "rails g model", "rails g controller", "rails g resource", "rails g scaffold", "generate model", "build controller", "background job" |
-| `migration-safety` | "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", "database migration" |
-| `troubleshooting` | "Docker error", "container won't start", "SSL certificate", "make setup failed", "port already in use", "permission denied", "can't connect to database" |
+| `account-scoping` | Creating or generating a Rails model, controller, resource, scaffold, or background job, including `rails g` generators |
+| `migration-safety` | Any database migration or schema change: creating or editing a migration, adding or removing columns, indexes, or tables |
+| `troubleshooting` | Docker, container, local SSL certificate, make target, port, file permission, or local database failures in the development environment |
 
 ### Specialists
 

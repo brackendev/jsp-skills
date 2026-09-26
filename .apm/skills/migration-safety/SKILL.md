@@ -1,6 +1,6 @@
 ---
 name: migration-safety
-description: 'Jumpstart Pro migration safety checklist that MUST activate when user mentions "create migration", "add migration", "modify migration", "rails generate migration", "add column", "add index", "change table", "remove column", "schema change", or "database migration". Enforces account:references on tenant tables and a zero-downtime safety floor. Activates proactively for all migration work.'
+description: 'Jumpstart Pro migration safety checklist. Use for any database migration or schema change: creating or editing a migration, adding or removing columns, indexes, or tables, or running rails generate migration. Enforces account:references on tenant tables and a zero-downtime safety floor.'
 allowed-tools: Read, Grep, Glob
 user-invocable: false
 ---
@@ -12,14 +12,6 @@ Reviews migrations for Jumpstart Pro account scoping and a production-safety flo
 ## Scope and precedence
 
 This skill carries Jumpstart Pro-specific migration requirements plus a compact safety floor. Resolve choices in this order: (1) the application's own migrations and dependencies, (2) the Jumpstart Pro patterns here, (3) general Rails migration guidance from a companion package such as 37signals-skills when present, (4) conventional Rails defaults. Deep general zero-downtime technique is intentionally not repeated here; this skill keeps only the floor needed to stay safe when installed standalone.
-
-## When This Activates
-
-- "migration", "create migration", "rails generate migration", "rails g migration"
-- "add column", "remove column", "change column", "rename column"
-- "add index", "remove index", "create table", "change table"
-- "db/migrate", "schema change"
-- Any database schema modifications
 
 ## Jumpstart Pro requirements
 
