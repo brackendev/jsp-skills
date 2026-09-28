@@ -56,7 +56,7 @@ Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsA
 
 ### Authorization
 
-- Every controller action calls Pundit `authorize` or `policy_scope`; owner-only features (billing, account deletion, owner transfer) check `current_account.owner?(current_user)`.
+- Every controller action calls Pundit `authorize` or `policy_scope`. Jumpstart Pro gates billing, checkout, and account editing and deletion on the account admin role (`require_current_account_admin`, or `require_account_admin` in `AccountsController`), not on ownership. Only ownership transfer checks `@account.owner?(current_user)`.
 - Policies receive `Current.account_user` (Jumpstart Pro's `pundit_user`) and authorize on its role, such as `account_user.admin?`. `ApplicationPolicy` and its `Scope` raise `Pundit::NotAuthorizedError` when the account user is nil, which rejects guests and signed-in non-members, so that check stays in place. Policy scopes return `scope.all` and let `acts_as_tenant` apply the account filter.
 - View conditionals use `policy(record).action?`; shared collections render through `policy_scope`.
 
@@ -79,7 +79,7 @@ end
 
 - Billing flows go through the Pay gem and its webhook controllers, not direct processor calls or hand-rolled webhook endpoints. Pay's controllers verify webhook signatures. Pay does not deduplicate events, so a redelivered event runs every listener again. Custom listeners must be idempotent (see the `billing-specialist` skill).
 - Prices are never accepted from the client. Validate the plan id against the `Plan` model server-side and use its amount, so a client cannot subscribe at a tampered price.
-- Billing pages are owner-only; invoice downloads validate account ownership.
+- Billing changes, checkout, and subscription changes require an account admin through `require_current_account_admin`. The billing overview (`BillingController#show`) and `Billing::ChargesController`, which serves receipts and invoices, are open to every account member. The charges controller finds the charge through `current_account.pay_charges`, so a member cannot download another account's receipt or invoice.
 
 ## Safety minimum
 

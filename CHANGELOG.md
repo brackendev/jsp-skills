@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.37] - 2026-09-28
+
+### Fixed
+
+- The `security-specialist` skill said billing, account deletion, and ownership transfer are owner-only features checked with `current_account.owner?(current_user)`, and that billing pages are owner-only. Jumpstart Pro gates billing, checkout, and account deletion on the account admin role, and only ownership transfer requires the owner. The skill now describes those checks and notes that the billing overview, receipts, and invoices are open to every account member but scoped to the current account's charges.
+
 ## [0.1.36] - 2026-09-28
 
 ### Fixed
