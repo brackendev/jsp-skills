@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.32] - 2026-09-28
+
+### Changed
+
+- The README now explains that automatic activation of `account-scoping`, `migration-safety`, and `troubleshooting` depends on the model. In Claude Code, Opus 5.5 activated each skill on every matching request tested, while Haiku 4.5 often answered without loading them. The README recommends naming the skill in the request when using a smaller model.
+
 ## [0.1.31] - 2026-09-28
 
 ### Fixed

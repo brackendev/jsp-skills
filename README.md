@@ -94,6 +94,8 @@ These activate from conversation context. They cannot be invoked directly.
 | `migration-safety` | Any database migration or schema change: creating or editing a migration, adding or removing columns, indexes, or tables |
 | `troubleshooting` | Docker, container, local SSL certificate, make target, port, file permission, or local database failures in the development environment |
 
+Automatic activation depends on the model. In Claude Code, Opus 5.5 activated each of these skills on every matching request tested, while Haiku 4.5 often answered without loading them. With a smaller model, name the skill in the request (for example, "Use the migration-safety skill. Add a status column to the projects table.") to make sure it loads.
+
 ### Specialists
 
 Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for each area and coordinate with each other (for example, `hotwire-specialist` defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`). They focus on Jumpstart Pro specifics and defer general Rails technique to a companion package such as [37signals-skills](https://github.com/marckohlbrugge/37signals-skills).
