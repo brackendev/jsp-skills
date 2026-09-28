@@ -62,18 +62,14 @@ Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsA
 ### Account switching and impersonation
 
 - Switching validates membership with `current_user.accounts.find(params[:id])`, updates the session and `Current.account` together, and logs the user, old and new account, and IP.
-- Billing and other destructive actions include the `ImpersonationProtection` concern so they are blocked while impersonating. Impersonation sessions are logged with start and end timestamps and cannot target system administrators.
+- Jumpstart Pro impersonates users with the `pretender` gem from Madmin (`Madmin::User::ImpersonatesController`). While impersonating, `current_user` and `Current.account_user` are the impersonated user and `true_user` is the admin, so role checks such as `require_current_account_admin` pass whenever the impersonated user holds the role. Jumpstart Pro provides no guard, log, or target restriction.
+- Billing and other destructive actions run an application-level `block_during_impersonation` before_action (the `ImpersonationGuard` concern in multi-tenancy-specialist) that compares `current_user` with `true_user`. The Madmin controller override logs impersonation sessions with start and end timestamps and refuses targets with `admin?`.
 
 ```ruby
 class Billing::SubscriptionsController < ApplicationController
-  include ImpersonationProtection
-  before_action :require_account_owner
-
-  private
-
-  def action_requires_real_user?
-    true # block billing during impersonation
-  end
+  before_action :authenticate_user!
+  before_action :require_current_account_admin, except: [:index, :show]
+  before_action :block_during_impersonation, except: [:index, :show, :edit]
 end
 ```
 
@@ -102,7 +98,7 @@ Look first at these, ordered by how often they appear and how much they cost:
 2. Background jobs that do not set the tenant from an account argument (unscoped queries across every account).
 3. Cache keys without `account_id` (cross-account cache leaks).
 4. API controllers skipping account-membership checks (cross-account API access).
-5. Billing controllers without `ImpersonationProtection` (support staff manipulating subscriptions).
+5. Billing controllers without an impersonation guard that compares `current_user` with `true_user` (support staff manipulating subscriptions).
 6. Pundit policies checking `user.present?` instead of account membership.
 7. Custom webhook controllers without signature verification (use Pay's controllers for payments).
 8. Accepting price amounts from the client (price tampering).

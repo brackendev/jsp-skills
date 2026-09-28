@@ -1003,41 +1003,26 @@ end
 
 ## Impersonation Guards
 
-**CRITICAL**: Block billing actions during impersonation to prevent abuse:
+**CRITICAL**: Block billing changes during impersonation. Jumpstart Pro impersonates users with the `pretender` gem, so `current_user` is the impersonated user and `true_user` is the signed-in admin. `require_current_account_admin` checks the impersonated user, so an admin impersonating an account admin passes it. Jumpstart Pro ships no guard for this.
+
+Use the `ImpersonationGuard` concern described in multi-tenancy-specialist, which blocks the action when `current_user != true_user`:
 
 ```ruby
-# app/controllers/billing_controller.rb
-class BillingController < ApplicationController
-  before_action :block_impersonation
-
-  private
-
-  def block_impersonation
-    if session[:impersonating]
-      redirect_to root_path,
-        alert: "Billing actions are disabled during impersonation"
-    end
-  end
+# app/controllers/application_controller.rb
+class ApplicationController < ActionController::Base
+  include ImpersonationGuard
 end
 
-# Or use a concern
-module BlockImpersonationForBilling
-  extend ActiveSupport::Concern
-
-  included do
-    before_action :prevent_billing_during_impersonation
-  end
-
-  private
-
-  def prevent_billing_during_impersonation
-    return unless respond_to?(:impersonating?) && impersonating?
-
-    redirect_to root_path,
-      alert: "Billing operations are disabled during impersonation"
-  end
+# app/controllers/billing_controller.rb (copied from lib/jumpstart/app/controllers/)
+class BillingController < ApplicationController
+  before_action :authenticate_user!
+  before_action :require_current_account_admin, except: [:show]
+  before_action :block_during_impersonation, except: [:show]
+  # ...
 end
 ```
+
+Apply the same `before_action` to the other controllers that change billing: `Billing::SubscriptionsController`, the controllers under `Billing::Subscriptions::` (cancels, pauses, resumes, payment methods), and `CheckoutsController`. These live under `lib/jumpstart/app/controllers/`. Copy each one to the same path under `app/controllers/`, which takes precedence, and keep the copies in sync during upstream merges.
 
 ## Webhook Logging
 
@@ -1324,7 +1309,7 @@ end
 - ❌ Not logging webhook events for debugging
 - ❌ Exposing API keys in logs or error messages
 - ❌ Using `subscription.ends_at` for dunning logic (use `past_due?` and `current_period_end`)
-- ✅ Block billing actions when `impersonating?` is true
+- ✅ Block billing actions with `block_during_impersonation` (`current_user != true_user`)
 - ✅ Log all webhook events with request IDs
 - ✅ Redact sensitive parameters
 - ✅ Use `subscription.past_due?` and `current_period_end` for grace periods

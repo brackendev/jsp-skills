@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.26] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist` and `security-specialist` skills described an `ImpersonationProtection` concern, an `impersonating?` helper, `Current.impersonator`, and a `session[:impersonating_user_id]` key as Jumpstart Pro features. Jumpstart Pro has none of these. It impersonates users with the `pretender` gem from Madmin, where `current_user` is the impersonated user and `true_user` is the admin. The skills now describe that flow and note that `require_current_account_admin` checks the impersonated user.
+- The `billing-specialist` impersonation guard read `session[:impersonating]`, which nothing sets, so it never blocked anything. All three skills now use one application-level `ImpersonationGuard` concern that blocks the action when `current_user != true_user`, and explain how to add it to the Jumpstart Pro billing controllers. The logging and admin-target examples now override `Madmin::User::ImpersonatesController`.
+
 ## [0.1.25] - 2026-09-28
 
 ### Fixed

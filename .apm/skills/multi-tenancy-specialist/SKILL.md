@@ -370,153 +370,123 @@ Do not write `session[:account_id]` or assign `Current.account` from a user-supp
 
 ## Impersonation (Admin Feature)
 
-Admins can impersonate users for support purposes. Jumpstart Pro provides built-in impersonation with safety features.
+System admins (users with `admin: true`) can sign in as another user from the Madmin admin area for support. Jumpstart Pro implements this with the `pretender` gem: `Authentication` and `Madmin::ApplicationController` call `impersonates :user`, and `ApplicationCable::Connection` identifies by `true_user`. Jumpstart Pro provides no impersonation guard concern, `impersonating?` helper, `Current.impersonator`, or impersonation log.
 
-### Starting Impersonation
+### How Impersonation Works
 
 ```ruby
-# In controllers (admin only)
-impersonate_user(user)
-# Sets session[:impersonating_user_id]
-# Sets Current.impersonator to the admin user
+# lib/jumpstart/app/controllers/madmin/user/impersonates_controller.rb (Jumpstart Pro)
+class Madmin::User::ImpersonatesController < Madmin::ApplicationController
+  def create
+    user = ::User.find(params[:user_id])
+    impersonate_user(user)
+    redirect_to main_app.root_path, status: :see_other
+  end
+
+  def destroy
+    user = current_user
+    stop_impersonating_user
+    redirect_to main_app.madmin_user_path(user), status: :see_other
+  end
+end
 ```
 
-### Stopping Impersonation
+- `impersonate_user(user)` stores the user's ID in `session[:impersonated_user_id]`. `stop_impersonating_user` deletes it.
+- While impersonating, `current_user` returns the impersonated user and `true_user` returns the signed-in admin. Both are available in views.
+- `Madmin::ApplicationController` authorizes with `true_user&.admin?`, so the admin area stays reachable during impersonation.
+- The `application` and `minimal` layouts render `impersonation_banner` (`FlashHelper`), which appears when `current_user != true_user` and shows a "Log out" button that stops impersonating.
+
+Every authorization check that reads `current_user` or `Current.account_user` sees the impersonated user. If that user is an account admin, `require_current_account_admin` lets the impersonating admin through, including on the billing controllers.
+
+### Blocking Sensitive Actions
+
+Add the guard as application code. Compare `current_user` with `true_user`:
 
 ```ruby
-stop_impersonating
-# Clears session[:impersonating_user_id]
-# Redirects back to admin user
-# Clears Current.impersonator
-```
-
-### Built-in Safeguards with ImpersonationProtection
-
-Jumpstart Pro includes an `ImpersonationProtection` concern that blocks destructive actions:
-
-```ruby
-# app/controllers/concerns/impersonation_protection.rb (Jumpstart provides this)
-module ImpersonationProtection
+# app/controllers/concerns/impersonation_guard.rb (application code)
+module ImpersonationGuard
   extend ActiveSupport::Concern
 
   included do
-    before_action :prevent_impersonation_for_sensitive_actions
+    helper_method :impersonating?
   end
 
   private
-
-  def prevent_impersonation_for_sensitive_actions
-    return unless impersonating?
-
-    if action_requires_real_user?
-      flash[:alert] = "You cannot perform this action while impersonating"
-      redirect_back fallback_location: root_path
-    end
-  end
-
-  def action_requires_real_user?
-    # Override in controllers to define protected actions
-    false
-  end
 
   def impersonating?
-    session[:impersonating_user_id].present? || Current.impersonator.present?
+    user_signed_in? && current_user != true_user
+  end
+
+  def block_during_impersonation
+    return unless impersonating?
+
+    redirect_back fallback_location: root_path,
+      alert: "This action is disabled while impersonating a user."
   end
 end
 
-# Use in controllers that handle sensitive operations
+# app/controllers/application_controller.rb
+class ApplicationController < ActionController::Base
+  include ImpersonationGuard
+end
+
+# Apply it to controllers that change billing, credentials, or account ownership
 class Billing::SubscriptionsController < ApplicationController
-  include ImpersonationProtection
-
-  private
-
-  def action_requires_real_user?
-    %w[create update destroy].include?(action_name)
-  end
+  before_action :block_during_impersonation, except: [:index, :show, :edit]
 end
 ```
 
-### Checking Impersonation Status
+Jumpstart Pro's billing controllers live under `lib/jumpstart/app/controllers/`. To add the `before_action`, copy the controller to the same path under `app/controllers/`, which takes precedence, and keep the copy in sync during upstream merges.
 
-Jumpstart provides helpers to check impersonation:
+### Logging and Restricting Impersonation
 
-```ruby
-# In controllers/views
-impersonating?  # => true/false
-Current.impersonator  # => Admin user who started impersonation
-
-# In views, show a banner
-<% if impersonating? %>
-  <div class="alert alert-warning">
-    You are impersonating <%= current_user.name %>.
-    <%= link_to "Stop Impersonating", stop_impersonating_path, method: :delete %>
-  </div>
-<% end %>
-```
-
-### Logging Impersonation Sessions
-
-Always log impersonation for security auditing:
+Jumpstart Pro does not log impersonation or restrict its targets. Override `Madmin::User::ImpersonatesController` in `app/controllers/madmin/user/impersonates_controller.rb` to add both:
 
 ```ruby
-# app/models/impersonation_log.rb
+class Madmin::User::ImpersonatesController < Madmin::ApplicationController
+  def create
+    user = ::User.find(params[:user_id])
+
+    if user.admin?
+      redirect_to main_app.madmin_user_path(user), alert: "System admins cannot be impersonated."
+      return
+    end
+
+    ImpersonationLog.create!(
+      impersonator: true_user,
+      impersonated_user: user,
+      started_at: Time.current,
+      ip_address: request.remote_ip
+    )
+    impersonate_user(user)
+    redirect_to main_app.root_path, status: :see_other
+  end
+
+  def destroy
+    user = current_user
+    ImpersonationLog.where(impersonator: true_user, impersonated_user: user, ended_at: nil)
+      .update_all(ended_at: Time.current)
+    stop_impersonating_user
+    redirect_to main_app.madmin_user_path(user), status: :see_other
+  end
+end
+
+# app/models/impersonation_log.rb (application code)
 class ImpersonationLog < ApplicationRecord
   belongs_to :impersonator, class_name: "User"
   belongs_to :impersonated_user, class_name: "User"
-  belongs_to :account, optional: true
-
-  scope :active, -> { where(ended_at: nil) }
-end
-
-# When starting impersonation
-def impersonate_user(user)
-  session[:impersonating_user_id] = user.id
-  Current.impersonator = current_user
-
-  ImpersonationLog.create!(
-    impersonator: current_user,
-    impersonated_user: user,
-    account: user.accounts.first,
-    started_at: Time.current,
-    ip_address: request.remote_ip
-  )
-end
-
-# When stopping
-def stop_impersonating
-  log = ImpersonationLog.active.find_by(
-    impersonator: current_user,
-    impersonated_user_id: session[:impersonating_user_id]
-  )
-  log&.update!(ended_at: Time.current)
-
-  session.delete(:impersonating_user_id)
-  Current.impersonator = nil
 end
 ```
+
+`ImpersonationLog` inherits from `ApplicationRecord`, not `AccountRecord`, because impersonation targets a user rather than an account, and `Madmin::ApplicationController` runs its actions without a tenant.
 
 ### Safeguards Checklist
 
-- ✅ Use `ImpersonationProtection` concern for sensitive controllers
-- ✅ Log all impersonation sessions with start/end times and IP addresses
-- ✅ Display prominent banner during impersonation
-- ✅ Block payment/billing actions (use `action_requires_real_user?`)
-- ✅ Require re-authentication for admin dashboard access
-- ✅ Never allow impersonation of system admins
-- ✅ Auto-expire impersonation sessions after timeout (e.g., 1 hour)
-
-```ruby
-# Additional safeguard: Prevent impersonating other admins
-def impersonate_user(user)
-  if user.system_admin?
-    flash[:alert] = "Cannot impersonate system administrators"
-    redirect_back fallback_location: admin_users_path
-    return
-  end
-
-  # Proceed with impersonation...
-end
-```
+- ✅ Include `ImpersonationGuard` and call `block_during_impersonation` in controllers that change billing, credentials, or account ownership
+- ✅ Log each impersonation session with start and end times and the IP address
+- ✅ Keep `impersonation_banner` in every layout
+- ✅ Refuse to impersonate system admins
+- ✅ Check `true_user`, not `current_user`, when an action needs the real signed-in admin
 
 ## Authorization (Pundit)
 
@@ -1575,11 +1545,10 @@ Periodic security review for tenant isolation:
 - [ ] Rate limiting applied per account, not globally
 
 **Impersonation:**
-- [ ] Impersonation logged with start/end timestamps
-- [ ] Billing/payment actions blocked during impersonation
-- [ ] Impersonation banner visible in all pages
-- [ ] Auto-expiration after timeout (recommended: 1 hour)
-- [ ] Cannot impersonate system admins
+- [ ] Impersonation logged with start/end timestamps in the `Madmin::User::ImpersonatesController` override
+- [ ] Billing/payment actions call `block_during_impersonation` (compares `current_user` with `true_user`)
+- [ ] `impersonation_banner` rendered in every layout
+- [ ] Cannot impersonate system admins (`user.admin?`)
 
 ### Deployment Checklist (Multi-Tenancy Focus)
 
