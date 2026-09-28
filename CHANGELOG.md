@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.27] - 2026-09-28
+
+### Fixed
+
+- The seven `*-specialist` skills did not set `user-invocable: false`, so Claude Code listed them in the `/` menu even though the documentation says they cannot be invoked directly. They now set the field, matching `account-scoping`, `migration-safety`, and `troubleshooting`. The model still activates them from conversation context.
+
 ## [0.1.26] - 2026-09-28
 
 ### Fixed

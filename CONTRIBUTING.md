@@ -59,6 +59,6 @@ For the argument grammar, scope vocabulary, and mutation defaults that every use
 | Setting | When to use |
 |---------|-------------|
 | `user-invocable: true`, `disable-model-invocation: true` | User-only slash command (for example `upstream-sync`, `deploy-check`). |
-| `user-invocable: false` | Model-invoked from conversation context (for example `migration-safety`). Omitting the field also makes the skill user-invocable. |
+| `user-invocable: false` | Model-invoked from conversation context (for example `migration-safety` and every `*-specialist` skill). Omitting the field also makes the skill user-invocable. |
 
 Every skill carries `agents/openai.yaml` whose `policy.allow_implicit_invocation` matches the table above (`true` for model-invoked, `false` for user-only).
