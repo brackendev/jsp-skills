@@ -76,7 +76,7 @@ end
 
 ### Pay billing security
 
-- Billing flows go through the Pay gem and its webhook controllers (which verify signatures and track idempotency), not direct processor calls or hand-rolled webhook endpoints.
+- Billing flows go through the Pay gem and its webhook controllers, not direct processor calls or hand-rolled webhook endpoints. Pay's controllers verify webhook signatures. Pay does not deduplicate events, so a redelivered event runs every listener again. Custom listeners must be idempotent (see the `billing-specialist` skill).
 - Prices are never accepted from the client. Validate the plan id against the `Plan` model server-side and use its amount, so a client cannot subscribe at a tampered price.
 - Billing pages are owner-only; invoice downloads validate account ownership.
 

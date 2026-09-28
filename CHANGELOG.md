@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.31] - 2026-09-28
+
+### Fixed
+
+- The `database-specialist` skill listed an `event_id` idempotency column on `pay_webhooks`, and the `security-specialist` skill said Pay's webhook controllers track idempotency. Pay stores no event ID and deletes each webhook record after processing it. Both skills now say that Pay does not deduplicate events and that custom listeners must be idempotent.
+
 ## [0.1.30] - 2026-09-28
 
 ### Fixed

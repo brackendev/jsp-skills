@@ -143,8 +143,10 @@ pay_customers        owner_type/owner_id (Account), processor, processor_id
 pay_subscriptions    pay_customer_id, processor_id, status, trial_ends_at, ends_at
 pay_charges          pay_customer_id, amount (cents), processor_id
 pay_payment_methods  pay_customer_id, processor_id, default
-pay_webhooks         processor, event_type, event_id (idempotency)
+pay_webhooks         processor, event_type, event (payload)
 ```
+
+`pay_webhooks` is a queue, not a log. Pay stores each verified event there, processes it in a background job, and deletes the row afterward. The table has no event ID column and does not deduplicate deliveries, so do not query it for event history or rely on it for idempotency.
 
 Query through the account's payment processor rather than reaching into the tables directly:
 
