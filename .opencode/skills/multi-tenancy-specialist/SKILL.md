@@ -9,16 +9,16 @@ You are a multi-tenancy specialist for Jumpstart Pro Rails applications. You ens
 
 This skill carries Jumpstart Pro-specific multi-tenancy guidance. Resolve choices in this order: (1) the application's own models and dependencies, (2) the Jumpstart Pro patterns here, (3) general Rails guidance from a companion package such as 37signals-skills when present, (4) conventional Rails defaults.
 
-Jumpstart Pro tenancy differs from some general Rails conventions, so state the difference where it affects the task. Authentication is Devise: do not introduce a custom Identity/Session/User flow. Data isolation is row-based through `acts_as_tenant` and `Current.account`, with `AccountRecord` as the base class. The account is selected from the request (session, path, or subdomain), but isolation is enforced at the row level by `acts_as_tenant`, not by path scoping alone. Use these existing systems rather than rebuilding them.
+Jumpstart Pro tenancy differs from some general Rails conventions, so state the difference where it affects the task. Authentication is Devise: do not introduce a custom Identity/Session/User flow. Data isolation is row-based through `acts_as_tenant` and `Current.account`, with `AccountRecord` as the base class. The account is selected from the request (path, domain, subdomain, or a signed cookie), but isolation is enforced at the row level by `acts_as_tenant`, not by path scoping alone. Use these existing systems rather than rebuilding them.
 
 ## Quick Reference
 
 | Context | Tenant Setup | Key Concern |
 |---------|--------------|-------------|
-| **Controllers** | Automatic via `set_current_account` before_action | Use `current_account` helper |
+| **Controllers** | Automatic via `SetCurrentRequestDetails` (and `AccountMiddleware` for path tenancy) | Use `current_account` helper |
 | **Models/Services** | Access via `Current.account` | Never use `current_account` helper |
 | **Background Jobs** | `ActsAsTenant.with_tenant(account)` in `perform` | Pass the account as an argument; `Current.account` is nil |
-| **Action Cable** | Set in `Connection#connect` or `Channel#subscribed` | Verify account membership |
+| **Action Cable** | `Connection#connect` sets `current_account` | Tenant is not set in channels; scope through `current_account` |
 | **Mailers** | Wrap in `ActsAsTenant.with_tenant` block | Pass account as param |
 | **Console/Rake** | Manually set with `ActsAsTenant.with_tenant` | Use `ActsAsTenant.fallback_tenant` for global tasks |
 | **Tests** | Use fixtures: `accounts(:one)`, `users(:account_owner)` | Switch accounts in system tests |
@@ -56,7 +56,7 @@ Jumpstart Pro tenancy differs from some general Rails conventions, so state the 
 The application uses account-based multi-tenancy where:
 - **Account** - The primary tenant model (personal or team accounts)
 - **AccountUser** - Join table between User and Account with role management
-- **current_account** - Helper method available in controllers/views for the active account
+- **current_account** - Controller and view helper that delegates to `Current.account`
 - **Current.account** - Thread-safe attribute for setting account context
 - **AccountRecord** - Base class for account-scoped models
 
@@ -112,79 +112,62 @@ With this default, a query on an `AccountRecord` subclass without a current tena
 
 Understanding when and how `Current.account` is set is critical for debugging multi-tenancy issues:
 
-**1. Request Start → Middleware clears Current attributes**
+Jumpstart Pro does not define a `set_current_account` method and does not store the account in `session`. The account is resolved by `Jumpstart::AccountMiddleware` and the `SetCurrentRequestDetails` concern, which `ApplicationController` includes. Rails resets `Current` between requests.
+
+**1. `Jumpstart::AccountMiddleware` (path-based tenancy only)**
+
+The engine adds this middleware when `Jumpstart.config.multitenancy` in `config/jumpstart.rb` includes `path`, and always in the test environment. When the first path segment is an integer or UUID (`/12345/projects`), it sets `Current.account = Account.find_by(id:)`, moves the segment into `script_name`, and routes the rest of the path normally. An unknown ID redirects to `/`.
+
+**2. `SetCurrentRequestDetails` before_actions**
+
 ```ruby
-# Rails automatically resets Current between requests
-Current.reset  # Clears account, account_user, user, roles, etc.
-```
-
-**2. Authentication → User identified**
-```ruby
-# Devise sets current_user
-authenticate_user!  # Sets current_user via Devise
-```
-
-**3. Account Selection → Current.account set**
-```ruby
-# ApplicationController before_action
-set_current_account
-
-# This method (in ApplicationController or AccountScoped concern):
-def set_current_account
-  if user_signed_in?
-    # Use session account_id or fall back to user's first account
-    account_id = session[:account_id]
-    @current_account = current_user.accounts.find_by(id: account_id) || current_user.accounts.first
-
-    # Set thread-safe Current attributes
-    Current.account = @current_account
-    Current.account_user = @current_account&.account_users&.find_by(user: current_user)
-    Current.roles = Current.account_user&.active_roles || []
+# lib/jumpstart/app/controllers/concerns/set_current_request_details.rb (abridged)
+included do |base|
+  if base < ActionController::Metal
+    set_current_tenant_through_filter if defined? ActsAsTenant
+    before_action :set_request_details
+    before_action :set_fallback_account
+    before_action -> { set_current_tenant(Current.account) } if defined?(ActsAsTenant)
   end
+end
+
+def set_request_details
+  Current.user = current_user
+  # Account may already be set by the AccountMiddleware
+  Current.account ||= account_from_domain || account_from_subdomain || account_from_cookie
+end
+
+def set_fallback_account
+  Current.account ||= fallback_account
 end
 ```
 
-**4. Request Processing → All queries scoped**
+Resolution order after the middleware:
+
+| Source | Enabled when | Lookup |
+|--------|--------------|--------|
+| Custom domain | `multitenancy` includes `subdomain` | `Account.find_by(domain: request.host)` |
+| Subdomain | `multitenancy` includes `subdomain` | `Account.find_by(subdomain: request.subdomains.first)` |
+| Signed cookie | Always; skipped when the user is signed out or the controller has no cookies (API) | `current_user.accounts.find_by(id: cookies.signed[:account_id])` |
+| Fallback | Signed-in user | Personal account first, then oldest; creates a default account if the user has none |
+
+When `multitenancy` is empty, only the cookie and fallback apply. This is the default.
+
+**3. Tenant set → all `AccountRecord` queries scoped**
+
+The last before_action calls `set_current_tenant(Current.account)`, so `ActsAsTenant.current_tenant` matches `Current.account` for the rest of the action:
+
 ```ruby
-# All AccountRecord queries automatically scoped to Current.account
 Document.all  # SELECT * FROM documents WHERE account_id = ?
 ```
 
-**5. Request End → Middleware clears again**
-```ruby
-Current.reset  # Ready for next request
-```
-
-**Path-based vs Subdomain-based Tenancy:**
-
-Jumpstart Pro supports both patterns. The tenant is selected differently:
-
-```ruby
-# Path-based (default): /accounts/123/projects
-# Account determined by URL params or session
-
-# Subdomain-based: acme.example.com
-# Account determined by subdomain
-def set_current_account
-  if subdomain = request.subdomain.presence
-    @current_account = Account.find_by!(domain: subdomain)
-    Current.account = @current_account
-  else
-    # Fall back to session-based selection
-    super
-  end
-end
-
-# Session configuration for subdomain SSO
-# config/application.rb
-config.session_store :cookie_store, key: '_app_session', domain: '.example.com'
-```
+**Membership is not checked for every source.** The cookie and fallback lookups go through `current_user.accounts`. The path, domain, and subdomain lookups use `Account.find_by` and do not check that the signed-in user belongs to the account. For a non-member, `Current.account_user` is nil, so `Current.account_admin?` is false and Pundit receives a nil `pundit_user`. Controllers that serve account data under path or subdomain tenancy must check membership (for example, `Current.account_user.present?`) or rely on a policy that rejects a nil account user.
 
 **API controllers**
 
 `Api::BaseController` includes `SetCurrentAccount`, which resolves the account from a nested route parameter (`/api/v1/accounts/:account_id/...`) or the user's single account, sets `Current.account`, and responds `:forbidden` when the user does not belong to that account. The `api-specialist` skill documents the stack.
 
-**IMPORTANT:** The `current_account` helper depends on `set_current_account` being called. It's NOT automatically available in:
+**IMPORTANT:** The `current_account` helper reads `Current.account`, which `SetCurrentRequestDetails` sets during a request. It is not set in:
 - Background jobs
 - Mailers
 - Plain Ruby service objects
@@ -224,11 +207,6 @@ class DocumentService
     account.documents.process_all
   end
 end
-
-# Switching accounts (sets Current.account)
-Current.account = account
-# or via helper (same thing)
-switch_account(account)
 
 # Background jobs - explicit account scoping
 class ProcessJob < ApplicationJob
@@ -323,41 +301,23 @@ invitation.accept!(current_user)
 
 Users can belong to multiple accounts and switch between them:
 
-### Switch Account Helper
+Jumpstart Pro has no `switch_account` controller helper. How a switch works depends on the tenancy mode:
 
-```ruby
-# In controllers
-switch_account(account)
-# Sets Current.account and session[:account_id]
+| Mode | Switch mechanism |
+|------|------------------|
+| Subdomain (account has a subdomain) | Link to `root_url(subdomain: account.subdomain)` |
+| Path | Link to `root_url(script_name: "/#{account.id}")`; `AccountMiddleware` reads the ID |
+| Session cookie (default) | `PATCH /accounts/:id/switch` writes `cookies.signed.permanent[:account_id]` and redirects |
 
-# Redirect to account's dashboard
-redirect_to root_path  # Scoped to current_account
-```
+`AccountsController#switch` loads the account with `current_user.accounts.find(params[:id])` in its `set_account` before_action, so a user cannot switch to an account they do not belong to. The new account takes effect on the next request, not the current one.
 
-### Account Switcher UI
-
-Jumpstart includes a dropdown for switching accounts in the navbar:
+In views, use the `switch_account_button(account)` helper from `AccountsHelper`. It renders a link for subdomain and path modes and a `PATCH` button to `switch_account_path(account)` for cookie mode:
 
 ```erb
-<!-- app/views/layouts/_account_switcher.html.erb -->
-<%= link_to "Switch to #{account.name}", switch_account_path(account),
-    method: :post %>
+<%= switch_account_button(account, return_to: request.path) %>
 ```
 
-### Guards
-
-Always check account membership before switching:
-
-```ruby
-class AccountsController < ApplicationController
-  def switch
-    account = current_user.accounts.find(params[:id])
-    switch_account(account)
-  end
-end
-```
-
-Never allow switching to accounts the user doesn't belong to.
+Do not write `session[:account_id]` or assign `Current.account` from a user-supplied ID in a controller. The cookie lookup in `SetCurrentRequestDetails` goes through `current_user.accounts`, and bypassing it skips that membership check.
 
 ## Impersonation (Admin Feature)
 
@@ -824,64 +784,71 @@ ProjectMailer.with(account: current_account, project: @project).created.deliver_
 
 ### Action Cable Channels
 
-WebSocket channels need account scoping in both `Connection` and `Channel`:
+Jumpstart Pro resolves the account once, when the WebSocket connects, using the same `SetCurrentRequestDetails` lookups as controllers:
 
-**Connection-level authentication:**
 ```ruby
-# app/channels/application_cable/connection.rb
+# app/channels/application_cable/connection.rb (Jumpstart Pro)
 module ApplicationCable
   class Connection < ActionCable::Connection::Base
-    identified_by :current_user, :current_account
+    include SetCurrentRequestDetails
+
+    identified_by :current_user, :current_account, :true_user
+    impersonates :user
+
+    delegate :params, :session, to: :request
 
     def connect
       self.current_user = find_verified_user
-      # Don't set current_account here - multiple accounts per user
-      # Set in individual channels based on subscription params
+      set_request_details
+      set_fallback_account
+      self.current_account = Current.account
+
+      logger.add_tags "ActionCable", "User #{current_user.id}", "Account #{current_account.id}"
     end
 
-    private
+    protected
 
     def find_verified_user
-      if verified_user = User.find_by(id: cookies.encrypted[:user_id])
-        verified_user
+      if (current_user = env["warden"].user(:user))
+        current_user
       else
         reject_unauthorized_connection
       end
     end
+
+    def user_signed_in?
+      !!current_user
+    end
+
+    # Used by set_request_details
+    def set_current_tenant(account)
+      ActsAsTenant.current_tenant = account
+    end
   end
 end
 ```
 
-**Channel-level scoping:**
+The user comes from the Devise (Warden) session, and the account comes from the domain, subdomain, signed `account_id` cookie, or fallback account. Rails mounts Action Cable at `/cable` by default, and that path carries no account ID, so `AccountMiddleware` does not select the account for the connection. `SetCurrentRequestDetails` only adds its before_actions to controllers, so `connect` never calls the connection's `set_current_tenant` and does not set the `acts_as_tenant` tenant. Channel code should read the `current_account` identifier, which lives for the whole connection, instead of `Current.account`, which `connect` sets only while it runs.
+
+**Channel-level scoping:** channels read the `current_account` connection identifier. Scope queries through it or wrap them in `ActsAsTenant.with_tenant`, and derive stream names from it rather than from subscription params:
+
 ```ruby
 class DocumentChannel < ApplicationCable::Channel
   def subscribed
-    # CRITICAL: Verify account membership before setting Current.account
-    account = current_user.accounts.find(params[:account_id])
-    Current.account = account
-
-    # Now safe to access account-scoped data
-    stream_from "document_updates_#{account.id}"
+    # current_account comes from the connection, not from client params
+    stream_for current_account
   end
 
   def receive(data)
-    # Current.account already set in subscribed
-    document = Document.find(data['document_id'])  # Auto-scoped
-    document.update!(data['attributes'])
+    document = current_account.documents.find(data["document_id"])
+    document.update!(data["attributes"])
 
-    # Broadcast to account's channel
-    ActionCable.server.broadcast(
-      "document_updates_#{Current.account.id}",
-      { document: document, action: 'updated' }
-    )
-  end
-
-  def unsubscribed
-    # Cleanup if needed
-    Current.account = nil
+    DocumentChannel.broadcast_to(current_account, {document: document, action: "updated"})
   end
 end
 ```
+
+A channel that accepts an account ID from `params` must look it up through `current_user.accounts` so that a client cannot subscribe to another account's stream.
 
 ### Active Storage and File Uploads
 
@@ -1326,8 +1293,8 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     other_account = accounts(:two)
     @user.accounts << other_account  # Add user to second account
 
-    post switch_account_url(other_account)
-    assert_redirected_to root_url
+    switch_account(other_account)  # Jumpstart Pro test helper: PATCH /accounts/:id/switch
+    assert_redirected_to root_path
 
     get projects_url
     # Now seeing projects from other_account
@@ -1347,7 +1314,7 @@ class ProjectsSystemTest < ApplicationSystemTestCase
   end
 
   test "switching accounts shows different projects" do
-    # Sign in sets current_account
+    # Signing in selects the fallback account (personal account first)
     sign_in @user
     visit projects_path
 
@@ -1358,20 +1325,12 @@ class ProjectsSystemTest < ApplicationSystemTestCase
     # Switch to account two
     other_account = accounts(:two)
     @user.accounts << other_account
-    switch_account(other_account)
+    switch_account(other_account)  # Jumpstart Pro helper in ApplicationSystemTestCase
     visit projects_path
 
     # Should see account two's projects
     assert_selector "h1", text: projects(:project_two).title
     assert_no_selector "h1", text: projects(:project_one).title
-  end
-
-  private
-
-  def switch_account(account)
-    visit root_path
-    click_on "Switch Account"
-    click_on account.name
   end
 end
 ```
@@ -1503,10 +1462,10 @@ Use this checklist before shipping any feature that involves tenant data:
 - [ ] API documentation includes account_id parameter
 
 **Action Cable Channels:**
-- [ ] `subscribed` verifies account membership before setting `Current.account`
-- [ ] Channel streams scoped to account: `stream_from "updates_#{account.id}"`
-- [ ] `receive` method assumes `Current.account` already set
-- [ ] `unsubscribed` cleans up `Current.account`
+- [ ] Channels use the `current_account` connection identifier, not `Current.account`
+- [ ] Streams derived from `current_account` (`stream_for current_account`), not from client params
+- [ ] Queries scoped through `current_account` or `ActsAsTenant.with_tenant(current_account)`; the tenant is not set in channels
+- [ ] Any account ID taken from `params` is looked up through `current_user.accounts`
 
 **Testing:**
 - [ ] Unit tests use `ActsAsTenant.with_tenant(accounts(:one))` wrapper

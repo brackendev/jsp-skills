@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.22] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist` skill described a `set_current_account` before_action that stored the account in `session[:account_id]`, and a `switch_account(account)` controller helper. Jumpstart Pro has neither. The request lifecycle section now describes `Jumpstart::AccountMiddleware` for path tenancy and the `SetCurrentRequestDetails` lookups (custom domain, subdomain, signed `account_id` cookie, then fallback account), followed by `set_current_tenant(Current.account)`. It also notes that the path, domain, and subdomain lookups do not check membership.
+- The account switching section now describes `PATCH /accounts/:id/switch`, which writes a signed cookie, and the `switch_account_button` view helper. The controller and system test examples use the `switch_account` test helpers that Jumpstart Pro provides.
+- The Action Cable example now matches Jumpstart Pro's `Connection`, which sets `current_account` in `connect`. Channels scope through that identifier and stream with `stream_for current_account` instead of trusting an account ID from subscription params, because the tenant is not set in channels.
+
 ## [0.1.21] - 2026-09-28
 
 ### Fixed
