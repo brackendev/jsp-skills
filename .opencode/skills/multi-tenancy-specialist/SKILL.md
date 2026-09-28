@@ -165,7 +165,25 @@ Document.all  # SELECT * FROM documents WHERE account_id = ?
 
 **API controllers**
 
-`Api::BaseController` includes `SetCurrentAccount`, which resolves the account from a nested route parameter (`/api/v1/accounts/:account_id/...`) or the user's single account, sets `Current.account`, and responds `:forbidden` when the user does not belong to that account. The `api-specialist` skill documents the stack.
+`Api::BaseController` includes `SetCurrentRequestDetails`, skips the fallback account, and adds its own lookup from the `account_id` parameter:
+
+```ruby
+# lib/jumpstart/app/controllers/api/base_controller.rb (abridged)
+skip_before_action :set_fallback_account
+before_action :set_account_from_param
+
+def set_account_from_param
+  if (account_id = params[:account_id].presence)
+    Current.account ||= current_user.accounts.find_by_prefix_id(account_id)
+  end
+end
+```
+
+- API controllers have no cookies and no fallback account. Without domain or subdomain tenancy, `Current.account` is nil unless the request carries `account_id`.
+- `account_id` is the prefixed account ID (`acct_...`), looked up through `current_user.accounts`. An ID for an account the user does not belong to leaves `Current.account` nil. Jumpstart Pro does not respond `:forbidden`.
+- `set_account_from_param` runs after the before_action that calls `set_current_tenant(Current.account)`, so the account it finds does not become the `acts_as_tenant` tenant. `AccountRecord` queries in API actions are unscoped unless the controller sets the tenant itself (see Common Pitfall 2).
+
+The `api-specialist` skill documents the rest of the stack.
 
 **IMPORTANT:** The `current_account` helper reads `Current.account`, which `SetCurrentRequestDetails` sets during a request. It is not set in:
 - Background jobs
@@ -945,49 +963,38 @@ class ProcessUploadJob < ApplicationJob
 end
 ```
 
-### 2. API Controllers Missing Current.account (COMMON ERROR)
+### 2. API Controllers Without a Tenant (COMMON ERROR)
 
-**Problem:** API controllers skip `set_current_account`, so no tenant is set and `AccountRecord` queries return every account's rows.
+**Problem:** `Api::BaseController` sets `Current.account` from `params[:account_id]` only after the tenant has been set, and it skips the fallback account. Unless domain or subdomain tenancy found an account, `ActsAsTenant.current_tenant` is nil in API actions, so `AccountRecord` queries return every account's rows. Without an `account_id` parameter, `current_account` is nil as well.
 
 ```ruby
-# ❌ WRONG: API controller accessing AccountRecord without context
+# ❌ WRONG: Relies on a tenant that API controllers do not set
 class Api::V1::ProjectsController < Api::BaseController
   def index
     @projects = Project.all  # No tenant: returns every account's projects
-    render json: @projects
   end
 end
 
-# ✅ CORRECT: Nest routes and set account context explicitly
+# ✅ CORRECT: Require the account and set the tenant for the action
 class Api::V1::ProjectsController < Api::BaseController
-  # Route: GET /api/v1/accounts/:account_id/projects
-  def index
-    account = current_user.accounts.find(params[:account_id])
-    ActsAsTenant.with_tenant(account) do
-      @projects = Project.all  # Now scoped properly
-      render json: @projects
-    end
-  end
-end
-
-# ✅ BETTER: Extract to before_action
-class Api::V1::ProjectsController < Api::BaseController
-  before_action :set_account
+  # Route: GET /api/v1/accounts/:account_id/projects (account_id is the prefixed ID, acct_...)
+  before_action :require_account_tenant
 
   def index
-    @projects = Project.all  # Auto-scoped
-    render json: @projects
+    @projects = Project.all  # Scoped to current_account
   end
 
   private
 
-  def set_account
-    account = current_user.accounts.find(params[:account_id])
-    Current.account = account
-    Current.account_user = account.account_users.find_by(user: current_user)
+  def require_account_tenant
+    return head(:not_found) unless current_account
+
+    set_current_tenant(current_account)
   end
 end
 ```
+
+`Api::BaseController#set_account_from_param` already resolves the account through `current_user.accounts`, so a controller does not need to repeat the lookup. `Current.account_user` is a reader that `Current` computes from `Current.account` and `Current.user`. It is not an attribute, so do not assign it.
 
 ### 3. Console Commands Without Account Context (DEVELOPMENT TRAP)
 
@@ -1456,10 +1463,11 @@ Use this checklist before shipping any feature that involves tenant data:
 - [ ] Jobs enqueued with `current_account` as an argument
 
 **API Endpoints:**
-- [ ] Routes nested under `/api/v1/accounts/:account_id/`
-- [ ] Controller sets `Current.account` via `before_action`
-- [ ] Account membership verified: `current_user.accounts.find(params[:account_id])`
-- [ ] API documentation includes account_id parameter
+- [ ] Account-scoped routes nested under `/api/v1/accounts/:account_id/`, where `account_id` is the prefixed account ID
+- [ ] Controller responds `:not_found` when `current_account` is nil (missing `account_id`, or an account the user does not belong to)
+- [ ] Controller calls `set_current_tenant(current_account)` or scopes queries through `current_account`, because `Api::BaseController` does not set the tenant from `account_id`
+- [ ] No `Current.account` or `Current.account_user` assignments from params
+- [ ] API documentation includes the `account_id` parameter
 
 **Action Cable Channels:**
 - [ ] Channels use the `current_account` connection identifier, not `Current.account`

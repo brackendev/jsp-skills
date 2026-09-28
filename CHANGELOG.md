@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.24] - 2026-09-28
+
+### Fixed
+
+- The `api-specialist` and `multi-tenancy-specialist` skills described a `SetCurrentAccount` concern that responds `:forbidden` for non-members, plus an `AccountScoped` concern and `rescue_from` handlers in `Api::BaseController`. Jumpstart Pro has none of these. Both skills now describe the actual stack: `Api::BaseController` includes `SetCurrentRequestDetails`, skips the fallback account, and sets `Current.account` from the prefixed `account_id` parameter through `current_user.accounts`. A missing or non-member ID leaves `current_account` nil.
+- That lookup runs after the tenant is set, so `AccountRecord` queries in API actions are not tenant-scoped. The API examples and Common Pitfall 2 now return `:not_found` when `current_account` is nil and call `set_current_tenant(current_account)`. They no longer assign `Current.account_user`, which is a computed reader. The API Endpoints checklist reflects the same rules.
+
 ## [0.1.23] - 2026-09-28
 
 ### Fixed

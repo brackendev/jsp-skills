@@ -34,28 +34,23 @@ Before integrating an external library, fetch its current documentation (Context
 
 ## Api::BaseController stack
 
-API controllers inherit from `Api::BaseController`, which composes the Jumpstart Pro authentication, authorization, and account-scoping concerns and centralizes error handling:
+API controllers inherit from `Api::BaseController`, which reuses the same authentication, authorization, and request-details concerns as `ApplicationController`:
 
 ```ruby
-# app/controllers/api/base_controller.rb
+# lib/jumpstart/app/controllers/api/base_controller.rb (abridged)
 class Api::BaseController < ActionController::API
-  include Authentication      # Devise authentication helpers
-  include Authorization       # Pundit authorization
-  include SetCurrentAccount   # sets Current.account
-  include AccountScoped       # scopes to the current account
+  include Authentication            # Devise helpers; current_account reads Current.account
+  include Authorization             # Pundit; pundit_user is Current.account_user
+  include SetCurrentRequestDetails  # Current.user, Current.account, acts_as_tenant tenant
 
-  rescue_from ActiveRecord::RecordNotFound, with: :not_found
-  rescue_from Pundit::NotAuthorizedError, with: :forbidden
-  rescue_from ActionController::ParameterMissing, with: :bad_request
-  rescue_from ActiveRecord::RecordInvalid, with: :unprocessable_entity
+  prepend_before_action :require_api_authentication, unless: -> { user_signed_in? }
 
-  prepend_before_action :require_api_authentication
+  skip_before_action :set_fallback_account
+  before_action :set_account_from_param
 
   private
 
   def require_api_authentication
-    return if user_signed_in?
-
     if (user = user_from_token)
       sign_in user, store: false
     else
@@ -63,31 +58,35 @@ class Api::BaseController < ActionController::API
     end
   end
 
-  def token_from_header
-    request.headers.fetch("Authorization", "").split(" ").last
-  end
+  def user_from_token = api_token&.tap { it.touch(:last_used_at) }&.user
 
   def api_token
-    @api_token ||= ApiToken.find_by(token: token_from_header)
+    @_api_token ||= ApiToken.find_by(token: token_from_header)
   end
 
-  def user_from_token
-    return unless api_token
+  def token_from_header = request.headers.fetch("Authorization", "").split(" ").last
 
-    api_token.touch(:last_used_at)
-    api_token.user
+  def set_account_from_param
+    if (account_id = params[:account_id].presence)
+      Current.account ||= current_user.accounts.find_by_prefix_id(account_id)
+    end
   end
 end
 ```
 
-`SetCurrentAccount` resolves the account from a nested route parameter (`/api/v1/accounts/:account_id/...`) or the user's single account, and responds `:forbidden` when the user does not belong to the requested account. Coordinate the account-resolution and Pundit policy design with `multi-tenancy-specialist`.
+Jumpstart Pro does not define `SetCurrentAccount` or `AccountScoped` concerns, and `Api::BaseController` adds no `rescue_from` handlers. Add error handling in the application's API controllers when clients need JSON error bodies.
+
+`set_account_from_param` reads the prefixed account ID (`acct_...`) from `params[:account_id]` and looks it up through `current_user.accounts`. When the parameter is missing or names an account the user does not belong to, `Current.account` stays nil. Jumpstart Pro does not respond `:forbidden` in that case. The lookup also runs after `SetCurrentRequestDetails` sets the `acts_as_tenant` tenant, so the tenant is not set from `account_id`. Coordinate the account-resolution and Pundit policy design with `multi-tenancy-specialist`.
 
 ## Account scoping in endpoints
 
-Scope every query through the account and authorize with Pundit for defense in depth. Never expose cross-account data:
+Require the account, set the tenant, scope every query through the account, and authorize with Pundit for defense in depth. Never expose cross-account data:
 
 ```ruby
 class Api::V1::DocumentsController < Api::BaseController
+  # Route: /api/v1/accounts/:account_id/documents
+  before_action :require_account_tenant
+
   def index
     @documents = policy_scope(Document) # Document < AccountRecord, scoped to the account
   end
@@ -97,6 +96,14 @@ class Api::V1::DocumentsController < Api::BaseController
     authorize @document
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  private
+
+  def require_account_tenant
+    return head(:not_found) unless current_account
+
+    set_current_tenant(current_account)
   end
 end
 ```
