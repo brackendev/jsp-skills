@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.41] - 2026-09-28
+
+### Changed
+
+- The README now states that Cursor and Kiro ignore `user-invocable: false`, so users of those runtimes can invoke the auto-triggered skills and specialists directly. It notes that Windsurf, now Devin Desktop, reads the field but that its effect on the `@` menu has not been confirmed.
+
 ## [0.1.40] - 2026-09-28
 
 ### Changed

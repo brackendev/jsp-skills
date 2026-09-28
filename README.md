@@ -86,7 +86,7 @@ Pre-deployment readiness checklist for a production release. It runs `make verif
 
 ### Auto-triggered
 
-These activate from conversation context. Each sets `user-invocable: false`, which Claude Code, GitHub Copilot (VS Code and the Copilot CLI), and Grok Build honor by leaving the skill out of their `/` commands. Codex, OpenCode, and Gemini CLI ignore the field and list these skills with the others, so a user can still invoke them directly. Cursor, Windsurf, and Kiro do not document the field, and their documentation describes direct invocation for every skill.
+These activate from conversation context. Each sets `user-invocable: false`, which Claude Code, GitHub Copilot (VS Code and the Copilot CLI), and Grok Build honor by leaving the skill out of their `/` commands. Codex, OpenCode, Gemini CLI, Cursor, and Kiro ignore the field, so a user can still invoke these skills directly. Windsurf, now Devin Desktop, documents `@`-mention invocation for every skill. Its agent reads the field, but whether it hides these skills from the `@` menu has not been confirmed.
 
 | Skill | Triggers |
 |-------|----------|
