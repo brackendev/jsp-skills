@@ -531,70 +531,56 @@ end
 
 ## Webhook Routes
 
-Routes are handled by Pay gem controllers:
+Pay mounts its engine automatically, so do not add webhook routes to `config/routes.rb`. Pay's default mount path is `/pay`, but Jumpstart Pro sets `config.routes_path = "/"` in `config/initializers/pay.rb`, so the endpoints are:
 
 ```ruby
-# config/routes.rb (or config/routes/billing.rb)
-Rails.application.routes.draw do
-  mount Pay::Webhooks::Engine, at: "/webhooks"
-
-  # This creates:
-  # POST /webhooks/stripe         => Pay::Webhooks::StripeController
-  # POST /webhooks/paddle_billing => Pay::Webhooks::PaddleBillingController
-  # POST /webhooks/paddle_classic => Pay::Webhooks::PaddleClassicController
-  # POST /webhooks/braintree      => Pay::Webhooks::BraintreeController
-end
+# POST /webhooks/stripe         => Pay::Webhooks::StripeController
+# POST /webhooks/paddle_billing => Pay::Webhooks::PaddleBillingController
+# POST /webhooks/paddle_classic => Pay::Webhooks::PaddleClassicController
+# POST /webhooks/braintree      => Pay::Webhooks::BraintreeController
 ```
+
+Each route exists only while its processor is enabled.
 
 ## How Pay Handles Webhooks
 
-Pay gem automatically:
-1. Verifies webhook signatures
-2. Delegates to `Pay::Webhook` event classes
-3. Syncs customer, subscription, and charge records
-4. Enqueues background job for processing
+1. The processor's webhook controller verifies the signature.
+2. If a listener is subscribed to the event (for example `stripe.invoice.payment_failed`), the controller stores the payload in a `Pay::Webhook` record and enqueues `Pay::Webhooks::ProcessJob`. Pay responds `200 OK` and discards events that no listener subscribes to.
+3. The job calls `Pay::Webhook#process!`, which publishes the event through `Pay::Webhooks.delegator` (built on `ActiveSupport::Notifications`). Pay's built-in listeners sync customer, subscription, charge, and payment method records.
+4. After every listener returns, Pay deletes the `Pay::Webhook` record. If a listener raises, the job fails and the record remains.
 
-**Do NOT manually construct webhook events**. Pay handles this. Instead, extend Pay's webhook processing:
+**Do NOT manually construct webhook events or override Pay's controllers**. Add custom behavior by subscribing a listener. A listener is any object that responds to `call(event)`:
 
 ```ruby
-# app/models/pay/webhook_extension.rb
-module Pay
-  module WebhookExtension
-    extend ActiveSupport::Concern
+# app/webhooks/stripe_subscription_canceled.rb
+class StripeSubscriptionCanceled
+  def call(event)
+    pay_subscription = Pay::Subscription.find_by_processor_and_id(:stripe, event.data.object.id)
+    return unless pay_subscription
 
-    # Override to add custom logic after Pay's processing
-    def process
-      super  # Call Pay's default processing
-
-      # Add custom business logic
-      case event.type
-      when "customer.subscription.deleted"
-        handle_subscription_cancellation
-      when "invoice.payment_failed"
-        handle_payment_failure
-      end
-    end
-
-    private
-
-    def handle_subscription_cancellation
-      # Custom logic after subscription canceled
-      account = pay_customer.owner
-      ActsAsTenant.with_tenant(account) do
-        SubscriptionCanceledMailer.notify(account).deliver_later
-      end
-    end
-
-    def handle_payment_failure
-      # Custom logic after payment failure
-      account = pay_customer.owner
-      ActsAsTenant.with_tenant(account) do
-        PaymentFailedMailer.notify(account).deliver_later
-      end
+    account = pay_subscription.customer.owner
+    ActsAsTenant.with_tenant(account) do
+      SubscriptionCanceledMailer.notify(account).deliver_later
     end
   end
 end
 ```
+
+```ruby
+# config/initializers/pay_webhooks.rb
+ActiveSupport.on_load(:pay) do
+  Pay::Webhooks.delegator.subscribe "stripe.customer.subscription.deleted", StripeSubscriptionCanceled.new
+end
+```
+
+Listener rules:
+
+- **Name events as `<processor>.<event type>`**, for example `stripe.customer.subscription.deleted` or `paddle_billing.subscription.canceled`.
+- **Pay's listeners run first.** Pay registers its built-in listeners before application initializers run, so by the time a custom listener runs for the same event, Pay has already synced its records.
+- **The event object depends on the processor.** Stripe listeners receive a `Stripe::Event`, so read the object from `event.data.object`. Paddle Billing listeners receive only the event's `data` payload, wrapped in an object with method access, so read fields directly (`event.id`, `event.customer_id`). Braintree listeners receive a parsed `Braintree::WebhookNotification`.
+- **Set the tenant explicitly.** Listeners run inside a background job with no `Current.account`, so look up the account from the Pay record and wrap tenant-scoped work in `ActsAsTenant.with_tenant`.
+- **Check Pay's own emails.** Pay already sends emails for some events, including `payment_failed` and `receipt`. Check `Pay.send_email?(:payment_failed, pay_subscription)` before sending a similar email, or disable Pay's version with `config.emails.payment_failed = false` in `Pay.setup`.
+- **Replace a built-in listener** with `Pay::Webhooks.delegator.unsubscribe "stripe.charge.succeeded"`. This removes every listener already subscribed to that event, including Pay's, so subscribe the replacement afterward.
 
 ## Processor-Specific Webhook Verification
 
@@ -644,57 +630,38 @@ Braintree::WebhookNotification.parse(
 
 ## Webhook Event Types
 
+These lists show the events Pay 11 subscribes to. Pay discards any other event, even if the processor sends it, until a custom listener subscribes to it. For example, Pay has no listener for Stripe `invoice.payment_succeeded` or Paddle Billing `transaction.payment_failed`. The processor's webhook settings must also send every event a listener needs.
+
 ### Stripe Events Pay Handles
 
-- `customer.created`
-- `customer.updated`
-- `customer.deleted`
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.payment_succeeded`
-- `invoice.payment_failed`
-- `charge.succeeded`
-- `charge.refunded`
-- `payment_method.attached`
-- `payment_method.updated`
-- `payment_method.detached`
+- `charge.succeeded`, `charge.updated`, `charge.refunded`
+- `payment_intent.succeeded`
+- `invoice.upcoming`, `invoice.updated`, `invoice.payment_action_required`, `invoice.payment_failed`
+- `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.trial_will_end`
+- `customer.updated`, `customer.deleted`
+- `payment_method.attached`, `payment_method.updated`, `payment_method.card_automatically_updated`, `payment_method.detached`
+- `checkout.session.completed`, `checkout.session.async_payment_succeeded`
+- `account.updated`
 
-### Paddle Billing Events
+### Paddle Billing Events Pay Handles
 
-- `customer.created`
-- `customer.updated`
-- `subscription.created`
-- `subscription.updated`
-- `subscription.paused`
-- `subscription.canceled`
+- `subscription.created`, `subscription.activated`, `subscription.updated`, `subscription.trialing`, `subscription.past_due`, `subscription.paused`, `subscription.resumed`, `subscription.canceled`, `subscription.imported`
 - `transaction.completed`
-- `transaction.payment_failed`
 
-### Paddle Classic Events
+### Paddle Classic Events Pay Handles
 
-- `subscription_created`
-- `subscription_updated`
-- `subscription_cancelled`
-- `subscription_payment_succeeded`
-- `subscription_payment_failed`
-- `subscription_payment_refunded`
+- `subscription_created`, `subscription_updated`, `subscription_cancelled`
+- `subscription_payment_succeeded`, `subscription_payment_refunded`
 
-## Idempotency (Pay Handles This)
+### Braintree Events Pay Handles
 
-Pay gem already prevents duplicate webhook processing via `Pay::Webhook` model tracking.
+- `subscription_went_active`, `subscription_charged_successfully`, `subscription_charged_unsuccessfully`, `subscription_went_past_due`, `subscription_trial_ended`, `subscription_canceled`, `subscription_expired`
 
-**DO NOT create your own `ProcessedWebhook` table**. Pay tracks event IDs automatically.
+## Idempotency
 
-If you need additional idempotency guarantees, extend Pay's webhook model:
+Pay does not deduplicate webhook events. The `pay_webhooks` table stores only `processor`, `event_type`, the `event` payload, and timestamps, and Pay deletes each row after processing it. A processor that retries delivery, or a job that runs twice, calls every listener again.
 
-```ruby
-# app/models/pay/webhook.rb (Pay creates this)
-# Pay::Webhook already has:
-#   - event_id (unique index)
-#   - processed_at
-#   - event_type
-```
+Pay's built-in listeners are safe to repeat because they sync records from the processor. Custom listeners must be safe to repeat too. Either make the work idempotent (update to a known state rather than incrementing or appending), or record the processor's event ID (`event.id` for Stripe) in an application table with a unique index and skip events already recorded.
 
 ## Webhook Testing
 
@@ -943,35 +910,29 @@ end
 
 ## Webhook Handler for Failed Payments
 
-Extend Pay's webhook processing to trigger dunning:
+Subscribe a listener to the payment failure event to start dunning (see Playbook 5 for how listeners work):
 
 ```ruby
-# config/initializers/pay_webhooks.rb
-Rails.configuration.to_prepare do
-  Pay::Webhooks::StripeController.class_eval do
-    after_action :trigger_dunning, only: :create
+# app/webhooks/stripe_payment_failed.rb
+class StripePaymentFailed
+  def call(event)
+    invoice = event.data.object
+    pay_customer = Pay::Customer.find_by(processor: :stripe, processor_id: invoice.customer)
+    return unless pay_customer
 
-    private
-
-    def trigger_dunning
-      return unless event_type == "invoice.payment_failed"
-
-      subscription = Pay::Subscription.find_by(
-        processor: "stripe",
-        processor_id: event.data.object.subscription
-      )
-      return unless subscription
-
-      account = subscription.customer.owner
-      DunningWorkflowJob.perform_later(account)
-    end
-
-    def event_type
-      request.env["pay.event"]&.type
-    end
+    DunningWorkflowJob.perform_later(pay_customer.owner)
   end
 end
 ```
+
+```ruby
+# config/initializers/pay_webhooks.rb
+ActiveSupport.on_load(:pay) do
+  Pay::Webhooks.delegator.subscribe "stripe.invoice.payment_failed", StripePaymentFailed.new
+end
+```
+
+Pay's own `stripe.invoice.payment_failed` listener already sends a payment failed email when the invoice belongs to a subscription that is not `incomplete`. If the dunning emails replace it, set `config.emails.payment_failed = false` in `Pay.setup`. For Paddle Billing, Pay does not subscribe to `transaction.payment_failed`, so subscribe a listener to `paddle_billing.transaction.payment_failed` or `paddle_billing.subscription.past_due` and enable that event in Paddle's notification settings.
 
 ## Grace Period Logic
 
@@ -1027,57 +988,44 @@ Apply the same `before_action` to the other controllers that change billing: `Bi
 
 ## Webhook Logging
 
-Log all webhook events for debugging and audit trails:
+Log all webhook requests for debugging and audit trails. Pay has no shared base controller for webhooks (each processor's controller inherits from `ActionController::API`), so add the callback to each enabled processor's controller. The controllers only verify and enqueue events, so this logs receipt. Failures inside listeners surface in `Pay::Webhooks::ProcessJob`.
 
 ```ruby
 # config/initializers/pay_webhooks.rb
 Rails.configuration.to_prepare do
-  Pay::Webhooks::BaseController.class_eval do
-    around_action :log_webhook_event
+  # List the controller for each processor enabled in config/jumpstart.yml
+  [
+    Pay::Webhooks::StripeController,
+    Pay::Webhooks::PaddleBillingController
+  ].each do |controller|
+    controller.class_eval do
+      around_action :log_webhook_event
 
-    private
+      private
 
-    def log_webhook_event
-      event_id = request.headers["X-Event-ID"] || params[:id]
-      processor = self.class.name.demodulize.gsub("Controller", "").underscore
+      def log_webhook_event
+        processor = self.class.name.demodulize.delete_suffix("Controller").underscore
+        event_id = params[:id] || params[:event_id]
+        event_type = params[:type] || params[:event_type] || params[:alert_name]
+        details = "processor=#{processor} event_id=#{event_id} event_type=#{event_type} request_id=#{request.request_id}"
 
-      Rails.logger.info(
-        "Webhook received",
-        processor: processor,
-        event_id: event_id,
-        event_type: params[:type] || params[:alert_name],
-        request_id: request.request_id
-      )
+        Rails.logger.info("Webhook received #{details}")
+        yield
+        Rails.logger.info("Webhook accepted #{details} status=#{response.status}")
+      rescue StandardError => e
+        Rails.logger.error("Webhook failed #{details} error=#{e.class}: #{e.message}")
 
-      yield
+        # Send to error tracker
+        Honeybadger.notify(e, context: {processor: processor, event_id: event_id}) if defined?(Honeybadger)
 
-      Rails.logger.info(
-        "Webhook processed",
-        processor: processor,
-        event_id: event_id,
-        request_id: request.request_id
-      )
-    rescue StandardError => e
-      Rails.logger.error(
-        "Webhook failed",
-        processor: processor,
-        event_id: event_id,
-        error: e.message,
-        backtrace: e.backtrace.first(5),
-        request_id: request.request_id
-      )
-
-      # Send to error tracker
-      Honeybadger.notify(e, context: {
-        processor: processor,
-        event_id: event_id
-      }) if defined?(Honeybadger)
-
-      raise
+        raise
+      end
     end
   end
 end
 ```
+
+`Rails.logger` methods accept a message string, not keyword arguments. Passing keywords, as in `Rails.logger.info("Webhook received", processor: processor)`, raises `ArgumentError`.
 
 ## Sensitive Data Redaction
 
@@ -1337,7 +1285,7 @@ end
 
 ### Billing Operations
 1. **Use Pay gem exclusively** - Never call Stripe/Paddle APIs directly
-2. **Extend, don't replace** - Extend Pay's webhook processing via callbacks
+2. **Extend, don't replace** - Handle webhook events with listeners, not controller overrides
 3. **Check processor capabilities** - Use capability matrix before processor-specific calls
 4. **Multi-tenancy first** - Always set account context before billing operations
 5. **Handle nil subscriptions** - Use safe navigation (`subscription&.method`)
@@ -1345,8 +1293,8 @@ end
 ### Webhook Handling
 6. **Trust Pay's verification** - Don't duplicate signature validation
 7. **Log comprehensively** - Track event IDs, request IDs, and outcomes
-8. **Use Pay's idempotency** - Don't create custom webhook tracking
-9. **Extend via callbacks** - Hook into Pay's processing with `after_action`
+8. **Make listeners idempotent** - Pay does not deduplicate events, so custom listeners must be safe to run twice
+9. **Subscribe listeners** - Register them with `Pay::Webhooks.delegator.subscribe` inside `ActiveSupport.on_load(:pay)`
 10. **Test with fixtures** - Use Stripe CLI and Pay::TestHelpers
 
 ### Security

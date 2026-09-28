@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.30] - 2026-09-28
+
+### Fixed
+
+- The `billing-specialist` webhook examples used APIs that Pay 11 does not have. `Pay::WebhookExtension` overrode a `process` method and called `pay_customer`, and the dunning trigger read `request.env["pay.event"]` in an `after_action` on `Pay::Webhooks::StripeController`. Pay processes events in a background job, so neither ran. Both examples now subscribe listeners with `Pay::Webhooks.delegator.subscribe` inside `ActiveSupport.on_load(:pay)`, and the skill explains the order in which listeners run, the event object each processor passes, and how to avoid duplicating Pay's payment failed email.
+- The skill told users to mount a nonexistent `Pay::Webhooks::Engine` in `config/routes.rb`. Pay mounts its engine automatically, and Jumpstart Pro sets the mount path to `/`.
+- The skill said Pay deduplicates webhook events by event ID and told users not to add their own tracking. Pay stores no event ID and deletes each webhook record after processing it, so the skill now tells users to make custom listeners idempotent.
+- The lists of events Pay handles included events Pay does not subscribe to, such as Stripe `invoice.payment_succeeded` and Paddle Billing `transaction.payment_failed`, and omitted others. The lists now match Pay 11, and the skill notes that Pay discards events without a listener.
+- The webhook logging example hooked a nonexistent `Pay::Webhooks::BaseController` and passed keyword arguments to `Rails.logger.info`, which raises `ArgumentError`. It now adds the callback to each processor's controller and logs a formatted string.
+
 ## [0.1.29] - 2026-09-28
 
 ### Fixed
