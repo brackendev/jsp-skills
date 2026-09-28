@@ -264,20 +264,46 @@ end
 ## Account Types & Roles
 
 ### Account Types
-- **Personal** - Single-user accounts (free tier)
-- **Team** - Multi-user with roles (paid tiers)
+- **Personal** - `personal: true`. When `Jumpstart.config.personal_accounts?` is enabled, `User#create_default_account` creates one for each new user, owned by that user. Otherwise the default account is a team account.
+- **Team** - `personal: false`. Can have multiple members with per-account roles.
 
-### User Roles (in AccountUser)
-- **owner** - Full control, billing access
-- **admin** - Manage members, settings
-- **member** - Basic access
+Use `account.personal?`, `account.team?`, and the `Account.personal` and `Account.team` scopes.
 
-Role checking:
+### Owner and Roles
+
+Jumpstart Pro has one account role and a separate owner:
+
+- **Owner** - `Account#owner` (`owner_id`). Not a role. Check it with `account.owner?(user)` or `account_user.account_owner?`. When an account is created, the owner is added as an admin member, and `AccountUser` validation prevents removing the owner's `admin` role.
+- **admin** - The only role in `AccountUser::ROLES` (`[:admin]`). Admins manage members, invitations, account settings, and billing.
+- **Members without a role** - An `AccountUser` whose `roles` has no `admin: true`. Jumpstart Pro has no `member` role and no `AccountUser::MEMBER` constant.
+
+Roles are stored as booleans in the `roles` JSON column. `AccountUser::Roles` defines a reader, predicate, writer, and scope for each entry in `ROLES`:
+
 ```ruby
-current_account_user.owner?
-current_account_user.admin_or_owner?
-@account.owner?(current_user)
+account_user.admin?        # => true
+account_user.admin = true  # casts "1", "true", etc. to a boolean
+account_user.active_roles  # => [:admin]
+AccountUser.admin          # scope: members with the admin role
+account.admins             # users with the admin role on this account
 ```
+
+Role checking for the current request:
+
+```ruby
+Current.account_user          # AccountUser for Current.user in Current.account, or nil
+Current.account_admin?        # => true when Current.account_user.admin?
+Current.roles                 # => [:admin] or []
+Current.account.owner?(Current.user)
+```
+
+There is no `current_account_user` helper, no `owner?` method on `AccountUser`, and no `admin_or_owner?` method. Because the owner is always an admin, `Current.account_admin?` covers the owner.
+
+In controllers, use the built-in guards:
+
+- `require_current_account_admin` (from the `Authentication` concern) redirects unless `Current.account_admin?`. Billing and checkout controllers use it.
+- `require_account_admin` (in `Accounts::BaseController`) checks the admin role on `@account` rather than `Current.account`.
+
+To add a role, add it to `AccountUser::ROLES` in `app/models/account_user.rb` (for example, `ROLES = [:admin, :editor]`). Do not use a reserved word such as `user` or `account` as a role name. `AccountInvitation` shares the same `ROLES`, and the member and invitation forms list each role as a checkbox.
 
 ## Account Invitations
 
@@ -286,33 +312,38 @@ Jumpstart provides invitation workflows for team accounts:
 ### Sending Invitations
 
 ```ruby
-# Create invitation
-invitation = current_account.account_invitations.create!(
+# Create an invitation and send the email
+invitation = Current.account.account_invitations.new(
   name: params[:name],
   email: params[:email],
-  roles: [AccountUser::MEMBER]  # or ADMIN, OWNER
+  invited_by: current_user,
+  admin: false  # or true to invite as an admin
 )
-
-# Email sent automatically via noticed notification
-# Invitation token generated and included in URL
+invitation.save_and_send_invite
+# => false when validation fails (for example, the email was already invited)
 ```
+
+`save_and_send_invite` saves the invitation and sends `AccountMailer#invite` with `deliver_later`. Calling `save` or `create!` alone does not send the email. `has_secure_token` generates the token used in the invitation URL. `send_invite` resends the email for an existing invitation.
 
 ### Accepting Invitations
 
 ```ruby
 # Find invitation by token
-invitation = AccountInvitation.find_by(token: params[:token])
+invitation = AccountInvitation.find_by!(token: params[:id])
 
 # Accept invitation
 invitation.accept!(current_user)
-# Creates AccountUser record and destroys invitation
+# Creates an AccountUser with the invitation's roles, destroys the invitation,
+# and notifies the account owner and inviter. Returns nil and adds errors
+# to the invitation when the AccountUser is invalid.
 ```
 
 ### Key Files
 
-- `app/models/account_invitation.rb` - Invitation model
-- `app/controllers/account_invitations_controller.rb` - CRUD actions
-- `app/views/account_invitations/` - Invitation views
+- `lib/jumpstart/app/models/account_invitation.rb` - Invitation model
+- `lib/jumpstart/app/controllers/accounts/account_invitations_controller.rb` - Admin actions to create, edit, resend, and delete invitations
+- `lib/jumpstart/app/controllers/account_invitations_controller.rb` - Invitee actions to view, accept, and decline an invitation
+- `lib/jumpstart/app/views/accounts/account_invitations/` and `lib/jumpstart/app/views/account_invitations/` - Invitation views
 - Routes in `config/routes/accounts.rb`
 
 ## Account Switching

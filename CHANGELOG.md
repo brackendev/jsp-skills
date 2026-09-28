@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.25] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist` roles section listed owner, admin, and member roles and called `current_account_user.owner?` and `admin_or_owner?`. Jumpstart Pro defines only `AccountUser::ROLES = [:admin]`, treats the owner as `Account#owner` rather than a role, and has no `current_account_user` helper. The section now describes the admin role, the owner, `Current.account_user`, `Current.account_admin?`, `Current.roles`, and the `require_current_account_admin` guard.
+- The invitation example passed `roles: [AccountUser::MEMBER]`, which does not exist, and said the email was sent automatically through a Noticed notification. The example now sets the `admin` role flag and calls `save_and_send_invite`, which sends `AccountMailer#invite`. The key file paths now point to the `lib/jumpstart/` locations.
+
 ## [0.1.24] - 2026-09-28
 
 ### Fixed
