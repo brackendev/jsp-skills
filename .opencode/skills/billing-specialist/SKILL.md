@@ -32,7 +32,7 @@ When the fetched documentation changes the implementation, name the source you r
 
 ## Defer to other skills
 
-❌ **Multi-tenancy scoping** → multi-tenancy-specialist (Current.account, AccountRecord.with_account)
+❌ **Multi-tenancy scoping** → multi-tenancy-specialist (Current.account, ActsAsTenant.with_tenant)
 ❌ **Authorization policies** → multi-tenancy-specialist (Pundit, policy scoping)
 ❌ **API endpoints** → api-specialist (ApiToken authentication, API endpoints)
 ❌ **Non-payment webhooks** → api-specialist (OAuth, general integrations)
@@ -42,7 +42,7 @@ When the fetched documentation changes the implementation, name the source you r
 
 ## Related skills
 
-- **multi-tenancy-specialist** for account-scoped billing and AccountRecord.with_account in jobs
+- **multi-tenancy-specialist** for account-scoped billing and ActsAsTenant.with_tenant in jobs
 - **hotwire-specialist** for billing UI, subscription forms, and Turbo-powered dashboards
 - **api-specialist** for billing API endpoints (seat changes, subscription management)
 - **security-specialist** for webhook security reviews and impersonation guard audits
@@ -108,7 +108,7 @@ Current.set(account: account) do
 end
 
 # In background jobs
-AccountRecord.with_account(account) do
+ActsAsTenant.with_tenant(account) do
   account.payment_processor.subscription.sync!
 end
 ```
@@ -377,7 +377,7 @@ class SyncSubscriptionQuantityJob < ApplicationJob
   def perform(account)
     return unless account.per_seat_pricing? && account.subscribed?
 
-    AccountRecord.with_account(account) do
+    ActsAsTenant.with_tenant(account) do
       subscription = account.payment_processor.subscription
       subscription.update_quantity(account.seats_count) if subscription.active?
     end
@@ -493,7 +493,7 @@ module PayChargeExtension
     return if order.completed?  # Skip if already fulfilled
 
     # Fulfill the order within account context
-    AccountRecord.with_account(order.account) do
+    ActsAsTenant.with_tenant(order.account) do
       order.fulfill!
       order.update!(status: :completed)
 
@@ -579,7 +579,7 @@ module Pay
     def handle_subscription_cancellation
       # Custom logic after subscription canceled
       account = pay_customer.owner
-      AccountRecord.with_account(account) do
+      ActsAsTenant.with_tenant(account) do
         SubscriptionCanceledMailer.notify(account).deliver_later
       end
     end
@@ -587,7 +587,7 @@ module Pay
     def handle_payment_failure
       # Custom logic after payment failure
       account = pay_customer.owner
-      AccountRecord.with_account(account) do
+      ActsAsTenant.with_tenant(account) do
         PaymentFailedMailer.notify(account).deliver_later
       end
     end
@@ -915,7 +915,7 @@ class DunningWorkflowJob < ApplicationJob
   queue_as :default
 
   def perform(account)
-    AccountRecord.with_account(account) do
+    ActsAsTenant.with_tenant(account) do
       return unless account.payment_failed?
 
       days_overdue = account.days_past_due
@@ -1317,7 +1317,7 @@ end
 - ✅ Always use Pay gem methods for billing operations
 - ✅ Let Pay handle webhook verification and processing
 - ✅ Extend Pay's webhook processing, don't replace it
-- ✅ Wrap billing jobs with `AccountRecord.with_account`
+- ✅ Wrap billing jobs with `ActsAsTenant.with_tenant`
 
 ### Webhooks & Security
 - ❌ Allowing billing actions during impersonation
@@ -1341,10 +1341,10 @@ end
 
 ### Multi-Tenancy Integration
 - ❌ Fetching subscription without account scoping
-- ❌ Missing `AccountRecord.with_account` in jobs
+- ❌ Missing `ActsAsTenant.with_tenant` in jobs
 - ❌ Not checking `Current.account` before billing operations
 - ✅ Always set `Current.account` before billing operations
-- ✅ Wrap background jobs with `AccountRecord.with_account(account)`
+- ✅ Wrap background jobs with `ActsAsTenant.with_tenant(account)`
 - ✅ Verify `subscription.customer.owner` matches expected account
 
 ## Best Practices

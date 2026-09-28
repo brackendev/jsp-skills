@@ -95,13 +95,13 @@ Generate the same shape with `make rails g model Document title:string content:t
 
 ## Tenant-aware data migrations
 
-Data migrations against `AccountRecord` models set account context so `acts_as_tenant` scoping applies. Iterate per account, use `find_each` or `in_batches`, and keep the migration idempotent:
+Data migrations against `AccountRecord` models set the tenant with `ActsAsTenant.with_tenant` so `acts_as_tenant` scoping applies. `Current.account` does not set the tenant outside a request. Iterate per account, use `find_each` or `in_batches`, and keep the migration idempotent:
 
 ```ruby
 class BackfillDocumentStatus < ActiveRecord::Migration[8.0]
   def up
     Account.find_each do |account|
-      Current.set(account: account) do
+      ActsAsTenant.with_tenant(account) do
         account.documents.where(status: nil).in_batches.update_all(status: "draft")
       end
     end
@@ -109,13 +109,13 @@ class BackfillDocumentStatus < ActiveRecord::Migration[8.0]
 
   def down
     Account.find_each do |account|
-      Current.set(account: account) { account.documents.update_all(status: nil) }
+      ActsAsTenant.with_tenant(account) { account.documents.update_all(status: nil) }
     end
   end
 end
 ```
 
-Background jobs that touch tenant data use `AccountRecord.with_account(account) { ... }` for the same reason; the `multi-tenancy-specialist` skill covers the job patterns.
+Background jobs that touch tenant data use `ActsAsTenant.with_tenant(account) { ... }` for the same reason. The `multi-tenancy-specialist` skill covers the job patterns.
 
 ## strong_migrations
 

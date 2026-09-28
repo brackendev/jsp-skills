@@ -17,10 +17,10 @@ Jumpstart Pro tenancy differs from some general Rails conventions, so state the 
 |---------|--------------|-------------|
 | **Controllers** | Automatic via `set_current_account` before_action | Use `current_account` helper |
 | **Models/Services** | Access via `Current.account` | Never use `current_account` helper |
-| **Background Jobs** | `AccountRecord.with_account(account)` wrapper | Must pass `account_id` as first arg |
+| **Background Jobs** | `ActsAsTenant.with_tenant(account)` in `perform` | Pass the account as an argument; `Current.account` is nil |
 | **Action Cable** | Set in `Connection#connect` or `Channel#subscribed` | Verify account membership |
-| **Mailers** | Wrap in `AccountRecord.with_account` block | Pass account as param |
-| **Console/Rake** | Manually set with `AccountRecord.with_account` | Use `ActsAsTenant.fallback_tenant` for global tasks |
+| **Mailers** | Wrap in `ActsAsTenant.with_tenant` block | Pass account as param |
+| **Console/Rake** | Manually set with `ActsAsTenant.with_tenant` | Use `ActsAsTenant.fallback_tenant` for global tasks |
 | **Tests** | Use fixtures: `accounts(:one)`, `users(:account_owner)` | Switch accounts in system tests |
 
 ## When to use this skill
@@ -28,7 +28,7 @@ Jumpstart Pro tenancy differs from some general Rails conventions, so state the 
 ✅ **Multi-tenancy architecture** (AccountRecord, Current.account, scoping)
 ✅ **Account/team management** (invitations, switching, roles)
 ✅ **Authorization with Pundit** (policies, scopes)
-✅ **Tenant-aware background jobs** (AccountRecord.with_account)
+✅ **Tenant-aware background jobs** (ActsAsTenant.with_tenant)
 ✅ **Account switching and impersonation**
 ✅ **Tenant isolation auditing**
 
@@ -68,14 +68,12 @@ Jumpstart Pro uses the `acts_as_tenant` gem under the hood. **AccountRecord** is
 # app/models/account_record.rb
 class AccountRecord < ApplicationRecord
   self.abstract_class = true
-  acts_as_tenant :account
 
-  # Provides class method for setting tenant context
-  def self.with_account(account, &block)
-    ActsAsTenant.with_tenant(account, &block)
-  end
+  acts_as_tenant :account if defined? ActsAsTenant
 end
 ```
+
+`AccountRecord` defines no helper for setting the tenant. Outside a request, set it with `ActsAsTenant.with_tenant(account) { ... }`, which sets `ActsAsTenant.current_tenant` for the block but does not set `Current.account`.
 
 **When to use AccountRecord vs acts_as_tenant directly:**
 
@@ -234,10 +232,10 @@ switch_account(account)
 
 # Background jobs - explicit account scoping
 class ProcessJob < ApplicationJob
-  def perform(account_id)
-    AccountRecord.with_account(Account.find(account_id)) do
-      # Current.account is now set for this block
-      Document.process_all
+  def perform(account)
+    ActsAsTenant.with_tenant(account) do
+      # The tenant is set for this block; Current.account is still nil
+      account.documents.process_all
     end
   end
 end
@@ -675,151 +673,104 @@ end
 
 ## Tenant-Aware Background Jobs
 
-Tenant-scoped jobs take `account_id` as the first `perform` argument, because `Account::BaseJob` reads the account from `job.arguments.first`.
+Jumpstart Pro does not include a tenant-aware base job class. Two facts determine the tenant context inside a job:
 
-### Pattern 1: Account::BaseJob (RECOMMENDED)
+- `Current.account` is nil. Rails resets `Current` attributes around every job, and nothing in Jumpstart Pro sets the account again.
+- When `acts_as_tenant` is enabled, the gem stores `ActsAsTenant.current_tenant` with the job at enqueue time and restores it before the job's callbacks run. A job enqueued during a request runs scoped to that request's account. A job enqueued without a tenant (console, rake task, scheduled job) runs without one, and because Jumpstart Pro sets `config.require_tenant = false`, its `AccountRecord` queries return rows from every account instead of raising.
 
-Jumpstart Pro provides `Account::BaseJob` that automatically handles tenant context:
+Pass the account to the job and set the tenant explicitly, so the job behaves the same wherever it is enqueued.
 
-```ruby
-# app/jobs/account/base_job.rb (provided by Jumpstart)
-module Account
-  class BaseJob < ApplicationJob
-    queue_as :default
-
-    # Automatically wraps perform with account context
-    around_perform do |job, block|
-      account = Account.find(job.arguments.first)
-      AccountRecord.with_account(account, &block)
-    end
-  end
-end
-
-# ✅ PREFERRED: Inherit from Account::BaseJob
-module Account
-  class ProcessDocumentsJob < BaseJob
-    # IMPORTANT: account_id must be first argument
-    def perform(account_id, document_ids: [], notify: true)
-      # Current.account automatically set via BaseJob
-      # No need to manually wrap with AccountRecord.with_account
-
-      documents = Document.where(id: document_ids)
-      documents.each(&:process!)
-
-      AccountMailer.processing_complete(Current.account).deliver_now if notify
-    end
-  end
-end
-
-# Enqueue with account_id first
-Account::ProcessDocumentsJob.perform_later(
-  current_account.id,
-  document_ids: [1, 2, 3],
-  notify: true
-)
-```
-
-### Pattern 2: Direct AccountRecord.with_account
-
-For jobs that don't inherit from `Account::BaseJob`:
+### Pattern 1: Explicit tenant in `perform` (RECOMMENDED)
 
 ```ruby
 class ProcessDocumentsJob < ApplicationJob
   queue_as :default
 
-  def perform(account_id, document_ids: [])
-    account = Account.find(account_id)
-
-    AccountRecord.with_account(account) do
-      # Current.account is now set for this block
-      # All AccountRecord queries automatically scoped
-      Document.where(id: document_ids).each(&:process!)
+  def perform(account, document_ids)
+    ActsAsTenant.with_tenant(account) do
+      account.documents.where(id: document_ids).find_each(&:process!)
     end
   end
 end
 
-# Enqueue with account_id first
-ProcessDocumentsJob.perform_later(current_account.id, document_ids: [1, 2, 3])
+ProcessDocumentsJob.perform_later(Current.account, [1, 2, 3])
 ```
 
-### Pattern 3: Explicit Current.account (NOT RECOMMENDED)
+ActiveJob serializes the `Account` argument as a GlobalID and loads it again when the job runs. Querying through `account.documents` keeps the query scoped even if the tenant is not set. Omit `ActsAsTenant.with_tenant` in applications that do not enable `acts_as_tenant`.
 
-Only use when you need fine-grained control:
+`ActsAsTenant.with_tenant` does not set `Current.account`. When code called from the job reads `Current.account` (model callbacks, notifiers, services), set both:
 
 ```ruby
-class NotifyTeamJob < ApplicationJob
-  def perform(account_id, message)
-    Current.account = Account.find(account_id)
-
-    # Now current_account context is available
-    Current.account.users.each do |user|
-      UserMailer.notification(user, message).deliver_now
+def perform(account, document_ids)
+  Current.set(account: account) do
+    ActsAsTenant.with_tenant(account) do
+      account.documents.where(id: document_ids).find_each(&:process!)
     end
-  ensure
-    Current.account = nil  # CRITICAL: Always clean up
   end
 end
 ```
 
-### ActiveJob Callbacks with Tenant Context
+### Pattern 2: Application base class for many tenant jobs
 
-Be careful with callbacks - account context must be set:
+When several jobs need the same setup, define a base class in the application. This class is application code and does not exist in Jumpstart Pro:
 
 ```ruby
-class Account::ExportJob < Account::BaseJob
-  before_perform :validate_export_permissions
-  after_perform :cleanup_temp_files
+# app/jobs/account_job.rb
+class AccountJob < ApplicationJob
+  # Subclasses take the account as the first perform argument.
+  around_perform do |job, block|
+    account = job.arguments.first
+    Current.set(account: account) do
+      ActsAsTenant.with_tenant(account, &block)
+    end
+  end
+end
 
-  def perform(account_id, format)
-    # Current.account already set by BaseJob's around_perform
-    @export = Export.generate(format: format)
+class ExportJob < AccountJob
+  before_perform :log_start
+  after_perform :log_finish
+
+  def perform(account, format)
+    Export.generate(format: format)
   end
 
   private
 
-  def validate_export_permissions
-    # Current.account available in callbacks
-    raise "Export disabled" unless Current.account.can_export?
+  def log_start
+    Rails.logger.info "Starting export for account #{Current.account.id}"
   end
 
-  def cleanup_temp_files
-    # Current.account still available
-    Rails.logger.info "Export complete for #{Current.account.name}"
+  def log_finish
+    Rails.logger.info "Finished export for account #{Current.account.id}"
   end
 end
+
+ExportJob.perform_later(Current.account, "csv")
 ```
 
-### Delayed Job / Sidekiq Integration
+### ActiveJob callbacks and tenant context
 
-For Sidekiq workers, create a similar base class:
+ActiveJob runs `before_perform`, `after_perform`, and `around_perform` callbacks in the order they are declared, parent class first. Each callback declared after an `around_perform` runs inside it. In `ExportJob` above, `log_start` and `log_finish` run inside `AccountJob`'s `around_perform`, so `Current.account` and the tenant are both set. A `before_perform` declared before the `around_perform` (earlier in the same class or in a parent class) runs outside it and sees `Current.account` as nil.
+
+With `acts_as_tenant` enabled, a tenant captured at enqueue time is restored before any callback runs, so `ActsAsTenant.current_tenant` is available in every callback of a job enqueued during a request. `Current.account` is not restored.
+
+### Sidekiq workers
+
+For native Sidekiq workers (not ActiveJob), Jumpstart Pro's `config/initializers/acts_as_tenant.rb` requires `acts_as_tenant/sidekiq` when Sidekiq is loaded. That middleware stores the current tenant with each job and runs the worker inside `ActsAsTenant.with_tenant`. The same limits apply: `Current.account` is not set, and a worker enqueued without a tenant runs without one. Pass the account ID and set the tenant explicitly:
 
 ```ruby
-# app/workers/account_worker.rb
-class AccountWorker
+class DocumentProcessorWorker
   include Sidekiq::Worker
 
-  def perform(account_id, *args)
-    AccountRecord.with_account(Account.find(account_id)) do
-      perform_scoped(*args)
+  def perform(account_id, document_id)
+    account = Account.find(account_id)
+    ActsAsTenant.with_tenant(account) do
+      account.documents.find(document_id).process!
     end
   end
-
-  def perform_scoped(*args)
-    raise NotImplementedError, "Subclasses must implement perform_scoped"
-  end
 end
 
-# app/workers/document_processor_worker.rb
-class DocumentProcessorWorker < AccountWorker
-  def perform_scoped(document_id)
-    # Current.account already set
-    document = Document.find(document_id)
-    document.process!
-  end
-end
-
-# Usage
-DocumentProcessorWorker.perform_async(current_account.id, document.id)
+DocumentProcessorWorker.perform_async(Current.account.id, document.id)
 ```
 
 ## Non-Request Contexts: Mailers, Action Cable, Active Storage
@@ -828,16 +779,16 @@ These contexts run outside normal request/response cycles and need explicit acco
 
 ### Action Mailers
 
-Mailers must wrap operations in `AccountRecord.with_account`:
+Mailers delivered with `deliver_later` run in a job, so `Current.account` is nil there. Pass the account and wrap account-scoped queries in `ActsAsTenant.with_tenant`:
 
 ```ruby
 # app/mailers/account_mailer.rb
 class AccountMailer < ApplicationMailer
   def project_notification(account, project)
-    AccountRecord.with_account(account) do
+    ActsAsTenant.with_tenant(account) do
       @account = account
       @project = project
-      @team_members = account.users  # Automatically scoped
+      @team_members = account.users
 
       mail to: account.owner.email, subject: "Project Update"
     end
@@ -847,15 +798,15 @@ end
 # Call from controller with account parameter
 AccountMailer.project_notification(current_account, @project).deliver_later
 
-# Or create a base mailer with automatic scoping
+# Or set the tenant for every action from params
 class ApplicationMailer < ActionMailer::Base
-  before_action :set_account_context
+  around_action :with_account_tenant
 
   private
 
-  def set_account_context
-    return unless params[:account]
-    AccountRecord.with_account(params[:account]) { yield }
+  def with_account_tenant(&block)
+    return yield unless params&.dig(:account)
+    ActsAsTenant.with_tenant(params[:account], &block)
   end
 end
 
@@ -863,7 +814,7 @@ end
 class ProjectMailer < ApplicationMailer
   def created
     @project = params[:project]
-    mail to: Current.account.owner.email
+    mail to: params[:account].owner.email
   end
 end
 
@@ -940,16 +891,17 @@ File uploads in background jobs or mailers need explicit account context:
 # ❌ DANGEROUS: Uploading files in background job without account context
 class ProcessUploadJob < ApplicationJob
   def perform(document_id, file_data)
-    document = Document.find(document_id)  # NoTenantSet error!
+    # Unscoped if the job was enqueued without a tenant: finds any account's document
+    document = Document.find(document_id)
     document.file.attach(file_data)
   end
 end
 
 # ✅ SAFE: Set account context before accessing AccountRecord
 class ProcessUploadJob < ApplicationJob
-  def perform(account_id, document_id, file_data)
-    AccountRecord.with_account(Account.find(account_id)) do
-      document = Document.find(document_id)
+  def perform(account, document_id, file_data)
+    ActsAsTenant.with_tenant(account) do
+      document = account.documents.find(document_id)
       document.file.attach(file_data)
 
       # ActiveStorage::Blob and ActiveStorage::Attachment
@@ -958,8 +910,8 @@ class ProcessUploadJob < ApplicationJob
   end
 end
 
-# Enqueue with account_id
-ProcessUploadJob.perform_later(current_account.id, @document.id, file_data)
+# Enqueue with the account
+ProcessUploadJob.perform_later(current_account, @document.id, file_data)
 ```
 
 **CRITICAL:** Active Storage's `Blob` and `Attachment` models are NOT tenant-scoped. Only the parent model (Document) enforces tenancy. This means:
@@ -1009,16 +961,17 @@ end
 # ❌ DANGEROUS: Uploading in background job without account context
 class ProcessUploadJob < ApplicationJob
   def perform(document_id, file_data)
-    document = Document.find(document_id)  # NoTenantSet error!
+    # Unscoped if the job was enqueued without a tenant: finds any account's document
+    document = Document.find(document_id)
     document.file.attach(file_data)
   end
 end
 
 # ✅ SAFE: Set account context before accessing AccountRecord
 class ProcessUploadJob < ApplicationJob
-  def perform(account_id, document_id, file_data)
-    AccountRecord.with_account(Account.find(account_id)) do
-      document = Document.find(document_id)
+  def perform(account, document_id, file_data)
+    ActsAsTenant.with_tenant(account) do
+      document = account.documents.find(document_id)
       document.file.attach(file_data)
     end
   end
@@ -1043,7 +996,7 @@ class Api::V1::ProjectsController < Api::BaseController
   # Route: GET /api/v1/accounts/:account_id/projects
   def index
     account = current_user.accounts.find(params[:account_id])
-    AccountRecord.with_account(account) do
+    ActsAsTenant.with_tenant(account) do
       @projects = Project.all  # Now scoped properly
       render json: @projects
     end
@@ -1082,7 +1035,7 @@ make console
 # ✅ SAFE: Set account context first
 make console
 > account = Account.first
-> AccountRecord.with_account(account) do
+> ActsAsTenant.with_tenant(account) do
 >   Project.create!(title: "Test")
 > end
 
@@ -1116,7 +1069,7 @@ end
 namespace :reports do
   task generate: :environment do
     Account.find_each do |account|
-      AccountRecord.with_account(account) do
+      ActsAsTenant.with_tenant(account) do
         Project.find_each do |project|
           project.generate_report
         end
@@ -1129,7 +1082,7 @@ end
 namespace :reports do
   task :generate, [:account_id] => :environment do |t, args|
     account = Account.find(args[:account_id])
-    AccountRecord.with_account(account) do
+    ActsAsTenant.with_tenant(account) do
       Project.find_each(&:generate_report)
     end
   end
@@ -1138,41 +1091,45 @@ end
 # Usage: rails reports:generate[123]
 ```
 
-### 5. Background Job Callbacks Missing Account Context
+### 5. Background Jobs Reading `Current.account`
 
-**Problem:** ActiveJob callbacks execute outside the `around_perform` block.
+**Problem:** `Current.account` is nil in every job unless the job sets it. `ActsAsTenant.with_tenant` and the tenant that `acts_as_tenant` restores at enqueue time do not set it. A callback also sees nil when it is declared before the `around_perform` that sets the context.
 
 ```ruby
-# ❌ WRONG: Callback runs before account context is set
-class Account::ExportJob < Account::BaseJob
-  before_perform :log_start
+# ❌ WRONG: Nothing sets Current.account in a job
+class ExportJob < ApplicationJob
+  def perform(account)
+    Rails.logger.info "Starting export for #{Current.account.name}"  # NoMethodError on nil
+    Export.generate
+  end
+end
 
-  def perform(account_id)
-    # Current.account set here by BaseJob
+# ❌ WRONG: before_perform declared before the around_perform runs outside it
+class ExportJob < ApplicationJob
+  before_perform { Rails.logger.info "Starting export for #{Current.account&.name}" }  # nil
+
+  around_perform do |job, block|
+    Current.set(account: job.arguments.first, &block)
+  end
+end
+
+# ✅ CORRECT: Read the account from the arguments, or set Current.account first
+class ExportJob < AccountJob  # AccountJob's around_perform sets Current.account and the tenant
+  before_perform :log_start  # Declared after the parent's around_perform, so it runs inside it
+
+  def perform(account)
     Export.generate
   end
 
   private
 
   def log_start
-    # Current.account is nil here! Callback runs BEFORE around_perform
-    Rails.logger.info "Starting export for #{Current.account&.name}"
-  end
-end
-
-# ✅ CORRECT: Access account directly from job arguments
-class Account::ExportJob < Account::BaseJob
-  before_perform do |job|
-    account = Account.find(job.arguments.first)
-    Rails.logger.info "Starting export for #{account.name}"
-  end
-
-  def perform(account_id)
-    # Current.account now set by BaseJob
-    Export.generate
+    Rails.logger.info "Starting export for #{Current.account.name}"
   end
 end
 ```
+
+See "ActiveJob callbacks and tenant context" under Tenant-Aware Background Jobs for the ordering rule.
 
 ### 6. Migration Generators Missing Indexes and null: false
 
@@ -1233,12 +1190,11 @@ project_one:
 - ✅ Always validate file access through parent AccountRecord
 
 ### Background Jobs & Async Operations
-- ❌ Forgetting `account_id` as first argument
-- ❌ Using callbacks without accessing job.arguments for account
-- ❌ Not using `Account::BaseJob` for tenant-scoped jobs
-- ✅ ALWAYS use `Account::BaseJob` for tenant-scoped jobs
-- ✅ Pass `account_id` as first argument
-- ✅ Access account from `job.arguments.first` in callbacks
+- ❌ Relying on `Current.account` in a job without setting it
+- ❌ Relying on the tenant captured at enqueue time, which is absent for jobs enqueued from the console, rake tasks, or schedules
+- ✅ Pass the account as an argument and set the tenant with `ActsAsTenant.with_tenant(account)`
+- ✅ Set `Current.account` with `Current.set` when code called from the job reads it
+- ✅ Declare callbacks that read the account after the `around_perform` that sets it
 
 ### Development Workflow
 - ❌ Running console without `ActsAsTenant.current_tenant` set
@@ -1246,7 +1202,7 @@ project_one:
 - ❌ Missing account context in seeds
 - ✅ Use console helpers to set account context
 - ✅ Iterate through accounts in rake tasks
-- ✅ Wrap seed data in `AccountRecord.with_account`
+- ✅ Wrap seed data in `ActsAsTenant.with_tenant`
 
 ## Best Practices
 
@@ -1330,7 +1286,7 @@ class ProjectTest < ActiveSupport::TestCase
   end
 
   test "should scope to current account" do
-    AccountRecord.with_account(accounts(:one)) do
+    ActsAsTenant.with_tenant(accounts(:one)) do
       projects = Project.all
       assert_equal 1, projects.count
       assert_includes projects, projects(:project_one)
@@ -1447,7 +1403,7 @@ account.account_users.create!(
 )
 
 # Seed account-scoped data
-AccountRecord.with_account(account) do
+ActsAsTenant.with_tenant(account) do
   Project.create!(title: "Sample Project", description: "Demo project")
   Document.create!(title: "Getting Started", content: "Welcome!")
 end
@@ -1461,7 +1417,7 @@ team = Account.create!(
 
 team.account_users.create!(user: admin, admin: true)
 
-AccountRecord.with_account(team) do
+ActsAsTenant.with_tenant(team) do
   Project.create!(title: "Team Project")
 end
 ```
@@ -1478,7 +1434,7 @@ make console
 # ✅ SAFE: Set account context
 make console
 > account = Account.first
-> AccountRecord.with_account(account) do
+> ActsAsTenant.with_tenant(account) do
 >   Project.all  # Scoped to account
 > end
 
@@ -1524,7 +1480,7 @@ Use this checklist before shipping any feature that involves tenant data:
 **Models & Database:**
 - [ ] New models inherit from `AccountRecord` (not `ApplicationRecord`)
 - [ ] Migrations include `account:belongs_to{index}` or manual `references :account, null: false, index: true`
-- [ ] Database seeds wrapped in `AccountRecord.with_account(account)`
+- [ ] Database seeds wrapped in `ActsAsTenant.with_tenant(account)`
 - [ ] Fixtures include `account:` references
 
 **Controllers & Views:**
@@ -1534,10 +1490,10 @@ Use this checklist before shipping any feature that involves tenant data:
 - [ ] File uploads validated through parent AccountRecord, not direct blob access
 
 **Background Jobs:**
-- [ ] Jobs inherit from `Account::BaseJob` or manually wrap with `AccountRecord.with_account`
-- [ ] `account_id` is the first parameter in `perform` method
-- [ ] Callbacks access account from `job.arguments.first`, not `Current.account`
-- [ ] Job enqueued with `current_account.id` as first argument
+- [ ] Jobs take the account as an argument and wrap tenant work in `ActsAsTenant.with_tenant(account)`
+- [ ] Jobs that read `Current.account` set it with `Current.set`
+- [ ] Callbacks that read the account are declared after the `around_perform` that sets it
+- [ ] Jobs enqueued with `current_account` as an argument
 
 **API Endpoints:**
 - [ ] Routes nested under `/api/v1/accounts/:account_id/`
@@ -1552,7 +1508,7 @@ Use this checklist before shipping any feature that involves tenant data:
 - [ ] `unsubscribed` cleans up `Current.account`
 
 **Testing:**
-- [ ] Unit tests use `AccountRecord.with_account(accounts(:one))` wrapper
+- [ ] Unit tests use `ActsAsTenant.with_tenant(accounts(:one))` wrapper
 - [ ] Controller tests use `sign_in` to set `Current.account`
 - [ ] System tests include account switching scenarios
 - [ ] Fixtures have explicit account associations
@@ -1562,27 +1518,26 @@ Use this checklist before shipping any feature that involves tenant data:
 Review this before deploying any background job:
 
 **Structure:**
-- [ ] Inherits from `Account::BaseJob` or includes manual `AccountRecord.with_account` wrapper
-- [ ] `account_id` is first parameter: `def perform(account_id, ...)`
-- [ ] No assumptions about `Current.account` being set automatically
+- [ ] Takes the account as an argument: `def perform(account, ...)`
+- [ ] Wraps tenant work in `ActsAsTenant.with_tenant(account)`, or inherits from an application base class that does
+- [ ] Does not assume `Current.account` is set, and sets it with `Current.set` when needed
 
 **Callbacks:**
-- [ ] `before_perform` / `after_perform` access account from `job.arguments.first`
-- [ ] Never rely on `Current.account` in callbacks (not set yet)
+- [ ] `before_perform` / `after_perform` that read the account are declared after the `around_perform` that sets it
 - [ ] Logging includes account identifier for debugging
 
 **Enqueueing:**
-- [ ] Always enqueued with `current_account.id` as first argument
-- [ ] No direct model IDs without account context
-- [ ] Example: `Job.perform_later(current_account.id, record.id)`
+- [ ] Enqueued with the account as an argument: `Job.perform_later(current_account, record.id)`
+- [ ] Jobs enqueued outside a request (console, rake, schedules) pass the account explicitly
+- [ ] No bare model IDs looked up without the account
 
 **Error Handling:**
-- [ ] Handles `ActsAsTenant::Errors::NoTenantSet` gracefully
+- [ ] Scopes queries through the account argument, because a missing tenant returns every account's rows (Jumpstart Pro sets `config.require_tenant = false`)
 - [ ] Logs errors with account context for debugging
 - [ ] Retries don't lose account context
 
 **File Operations:**
-- [ ] Active Storage operations wrapped in `with_account` block
+- [ ] Active Storage operations wrapped in `ActsAsTenant.with_tenant` block
 - [ ] File uploads validate parent record belongs to account
 - [ ] Temporary files cleaned up regardless of account
 
@@ -1609,7 +1564,7 @@ Periodic security review for tenant isolation:
 - [ ] File upload validations include account ownership
 
 **Background Processing:**
-- [ ] All jobs use `Account::BaseJob` or manual scoping
+- [ ] All tenant jobs set the tenant from an account argument
 - [ ] No global queries in background jobs
 - [ ] Scheduled tasks iterate through accounts explicitly
 - [ ] Rake tasks accept `account_id` parameter or iterate all accounts

@@ -30,12 +30,12 @@ end
 
 ### Account context in data migrations
 
-Data migrations that touch `AccountRecord` models set account context so `acts_as_tenant` scoping behaves as it does in the application. Iterate per account, batch the work, and keep it idempotent:
+Data migrations that touch `AccountRecord` models set the tenant with `ActsAsTenant.with_tenant` so `acts_as_tenant` scoping behaves as it does in the application. `Current.account` does not set the tenant outside a request. Iterate per account, batch the work, and keep it idempotent:
 
 ```ruby
 def up
   Account.find_each do |account|
-    Current.set(account: account) do
+    ActsAsTenant.with_tenant(account) do
       account.documents.where(status: nil).in_batches.update_all(status: "draft")
     end
   end
@@ -66,7 +66,7 @@ These prevent data loss and downtime. Treat them as hard requirements, not sugge
 - [ ] Breaking changes staged (no `NOT NULL` without default or backfill; no immediate column drop)
 - [ ] Indexes added concurrently on large tables; foreign keys indexed
 - [ ] Rollback tested with `make rails db:rollback`
-- [ ] Data migrations batched, idempotent, and account-scoped with `Current.set(account:)`
+- [ ] Data migrations batched, idempotent, and account-scoped with `ActsAsTenant.with_tenant(account)`
 - [ ] Suite passes: `make test-all`
 
 ## When to escalate

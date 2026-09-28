@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist`, `account-scoping`, `security-specialist`, `billing-specialist`, and `database-specialist` skills told the agent to use `Account::BaseJob` and `AccountRecord.with_account`, which Jumpstart Pro does not provide. They now use `ActsAsTenant.with_tenant(account)` with the account passed as a job argument. They also explain that `Current.account` is nil in a job, and that a job enqueued without a tenant returns every account's rows because Jumpstart Pro sets `config.require_tenant = false`.
+- The `multi-tenancy-specialist` skill contradicted itself about job callbacks. Common Pitfall 5 and the checklists said `before_perform` runs before the parent's `around_perform` and sees no account. ActiveJob runs callbacks in declaration order, parent class first, so a subclass callback runs inside the parent's `around_perform`. The pitfall and checklists now say so.
+- The `multi-tenancy-specialist` mailer example called `yield` from a `before_action`, which cannot wrap the action. It now uses `around_action`, and the mailer reads the account from `params` instead of `Current.account`, which is nil under `deliver_later`.
+- The `database-specialist` and `migration-safety` data-migration examples set `Current.set(account:)` and described it as enabling `acts_as_tenant` scoping. Outside a request, `Current.account` does not set the tenant, so the examples now use `ActsAsTenant.with_tenant(account)`.
+
 ## [0.1.19] - 2026-09-28
 
 ### Fixed

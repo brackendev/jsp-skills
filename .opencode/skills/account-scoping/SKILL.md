@@ -7,7 +7,7 @@ user-invocable: false
 
 # Account Scoping Checklist
 
-Fast checklist for Jumpstart Pro multi-tenancy when generating a model, controller, or background job. The `multi-tenancy-specialist` skill carries the full patterns (the `Current.account` request lifecycle, account switching, impersonation, `Account::BaseJob`, and Pundit policy and scope design). This checklist is the quick gate at generation time.
+Fast checklist for Jumpstart Pro multi-tenancy when generating a model, controller, or background job. The `multi-tenancy-specialist` skill carries the full patterns (the `Current.account` request lifecycle, account switching, impersonation, background-job tenant context, and Pundit policy and scope design). This checklist is the quick gate at generation time.
 
 ## Critical rule
 
@@ -41,17 +41,19 @@ end
 
 ## New background job
 
-1. Make `account_id` the first `perform` argument and enqueue with `current_account.id` first.
-2. Set account context: inherit from `Account::BaseJob`, or wrap the body in `AccountRecord.with_account(Account.find(account_id))`. A job that loads an `AccountRecord` without account context raises `NoTenantSet`.
+1. Pass the account as a `perform` argument and enqueue with `current_account`.
+2. Wrap the body in `ActsAsTenant.with_tenant(account)` and query through the account. `Current.account` is nil in a job. A job enqueued without a tenant (console, rake task, schedule) runs unscoped, and because Jumpstart Pro sets `config.require_tenant = false`, its `AccountRecord` queries return every account's rows instead of raising.
 
 ```ruby
 class ProcessDocumentJob < ApplicationJob
-  def perform(account_id, document_id)
-    AccountRecord.with_account(Account.find(account_id)) do
-      Document.find(document_id).process!
+  def perform(account, document_id)
+    ActsAsTenant.with_tenant(account) do
+      account.documents.find(document_id).process!
     end
   end
 end
+
+ProcessDocumentJob.perform_later(current_account, document.id)
 ```
 
 ## Verification

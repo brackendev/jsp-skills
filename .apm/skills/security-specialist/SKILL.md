@@ -51,7 +51,7 @@ redirect_to @document.file.url(expires_in: 5.minutes), allow_other_host: true
 
 ### Background jobs
 
-Tenant-scoped jobs inherit from `Account::BaseJob` (or wrap work in `AccountRecord.with_account(account)`), take `account_id` as the first `perform` argument, and read the account from the arguments rather than `Current.account`. A job that loads an `AccountRecord` without account context raises `NoTenantSet` or operates on the wrong account.
+Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsAsTenant.with_tenant(account)`, and read the account from the arguments rather than `Current.account`, which is nil in a job. Jumpstart Pro sets `config.require_tenant = false`, so a job that loads an `AccountRecord` without a tenant returns rows from every account instead of raising `NoTenantSet`.
 
 ### Authorization
 
@@ -99,7 +99,7 @@ Always enforce these, even when the companion package is absent:
 Look first at these, ordered by how often they appear and how much they cost:
 
 1. Active Storage blob downloads without parent `AccountRecord` validation (cross-account file access).
-2. Background jobs missing `Account::BaseJob` or `AccountRecord.with_account` (wrong-account data or `NoTenantSet`).
+2. Background jobs that do not set the tenant from an account argument (unscoped queries across every account).
 3. Cache keys without `account_id` (cross-account cache leaks).
 4. API controllers skipping account-membership checks (cross-account API access).
 5. Billing controllers without `ImpersonationProtection` (support staff manipulating subscriptions).
