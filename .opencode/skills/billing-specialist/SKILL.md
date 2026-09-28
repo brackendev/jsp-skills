@@ -95,21 +95,19 @@ end
 
 ### Multi-tenancy Context Requirement
 
-**CRITICAL**: Always ensure `Current.account` is set before billing operations:
+Pay calls act on the account they are called on. Pay models inherit from `ApplicationRecord`, not `AccountRecord`, so they are not tenant-scoped, and neither `Current.account` nor `ActsAsTenant.with_tenant` changes what `account.payment_processor` returns. Pick the account explicitly: `Current.account` in a controller, or an account passed as a job argument.
+
+Tenant context matters when billing code also reads or writes `AccountRecord` models. In a controller, `SetCurrentRequestDetails` sets the tenant from `Current.account`. Outside a request (jobs, Pay webhook processing, console), `Current.account` is nil and does not set the tenant. Because Jumpstart Pro sets `config.require_tenant = false`, a tenant-scoped query with no tenant returns every account's rows. Wrap that work in `ActsAsTenant.with_tenant`:
 
 ```ruby
-# WRONG - No tenant context
-account.set_payment_processor :stripe  # May leak data
+# In a controller: the account comes from the request
+Current.account.set_payment_processor :stripe
+Current.account.payment_processor.subscribe(plan: "pro_monthly")
 
-# CORRECT - With tenant context
-Current.set(account: account) do
-  account.set_payment_processor :stripe
-  account.payment_processor.subscribe(plan: "pro_monthly")
-end
-
-# In background jobs
+# In a job: pass the account and set the tenant before touching AccountRecord models
 ActsAsTenant.with_tenant(account) do
   account.payment_processor.subscription.sync!
+  UsageRecord.where(billed: false).update_all(billed: true)  # AccountRecord model, scoped to account
 end
 ```
 
@@ -488,12 +486,14 @@ module PayChargeExtension
     order_id = metadata["order_id"]
     return unless order_id
 
-    order = Order.find_by(id: order_id)
-    return unless order
-    return if order.completed?  # Skip if already fulfilled
+    # Pay processes webhooks in a background job with no tenant set, so set the
+    # tenant from the paying account before looking up the order. With Order
+    # inheriting from AccountRecord, an order_id from another account finds nothing.
+    ActsAsTenant.with_tenant(owner) do
+      order = Order.find_by(id: order_id)
+      return unless order
+      return if order.completed?  # Skip if already fulfilled
 
-    # Fulfill the order within account context
-    ActsAsTenant.with_tenant(order.account) do
       order.fulfill!
       order.update!(status: :completed)
 

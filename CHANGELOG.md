@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-09-28
+
+### Fixed
+
+- The `billing-specialist` skill called it critical to wrap Pay calls in `Current.set(account:)` and warned that calls without it "may leak data". Pay models are not tenant-scoped, and `Current.account` does not set the tenant, so the wrapper had no effect. The section now explains that Pay calls act on the account they are called on. It also explains that tenant context matters only for `AccountRecord` models, which need `ActsAsTenant.with_tenant` outside a request.
+- The `billing-specialist` fulfillment example looked up the order from charge metadata before setting a tenant. Pay processes webhooks in a background job with no tenant, so the lookup could match any account's order. The example now sets the tenant from the charge's paying account and looks up the order inside that block.
+
 ## [0.1.22] - 2026-09-28
 
 ### Fixed
