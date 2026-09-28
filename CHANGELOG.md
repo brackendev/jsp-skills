@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.29] - 2026-09-28
+
+### Fixed
+
+- The `deployment-specialist` skill used Kamal 1 commands and configuration that Kamal 2 removed. Jumpstart Pro uses Kamal 2. The skill configured Traefik labels and a `traefik:` section, ran `kamal traefik` commands, and checked `acme.json`. It now configures `proxy: ssl: true` with a `host`, troubleshoots certificates with `kamal proxy logs` and `kamal proxy reboot`, and notes that kamal-proxy's Let's Encrypt support works only with one server.
+- The skill told users to run `kamal env push` after changing secrets. Kamal 2 writes each role's environment file when it boots the app, so the skill now says to redeploy.
+- The migration pattern used `kamal deploy --skip-migrations`, which does not exist. The skill now explains that Jumpstart Pro's `bin/docker-entrypoint` runs `bin/rails db:prepare` when the web server boots, so every deploy migrates before the new container passes its health check, and migrations must stay backward compatible.
+- The skill described `kamal deploy --skip-push` as a fresh build. The option skips the build and push and deploys an existing image.
+- The skill used other commands and options that do not exist in Kamal 2 or fail there: `kamal doctor`, `kamal app versions`, `app logs --tail`, `--role=`, `rollback` without a version, `rails maintenance:enable`, and `docker` commands run through `kamal app exec`. They are replaced by `kamal config`, `kamal app containers`, `--lines`, `--roles=`, `rollback VERSION`, `kamal app maintenance` and `kamal app live`, `kamal prune all`, and SSH to the host. The `deploy-check` rollback step now passes a version as well.
+- Secret checks ran `kamal config | grep`, which never matches because `kamal config` does not print the app environment. They now list secret names from `kamal secrets print` without printing values. The skill also no longer calls `.kamal/secrets` a file to keep out of version control. Jumpstart Pro commits it, so it must hold references rather than raw credentials.
+
 ## [0.1.28] - 2026-09-28
 
 ### Fixed

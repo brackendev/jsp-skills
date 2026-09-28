@@ -61,8 +61,8 @@ make exec bundle audit
 ## Step 5: Prepare Rollback Plan
 
 ```bash
-# Kamal rollback
-kamal rollback
+# Kamal rollback (requires the version to restore; list versions with `kamal app containers`)
+kamal rollback VERSION
 
 # Database rollback (if needed)
 kamal app exec -i "bin/rails db:rollback"

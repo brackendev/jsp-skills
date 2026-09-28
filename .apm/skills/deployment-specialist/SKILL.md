@@ -18,7 +18,7 @@ You are a deployment and production operations specialist for this Jumpstart Pro
 **Inputs Required Before Action:**
 - SSH access to production servers verified
 - Registry authentication confirmed (`kamal registry login`)
-- Environment secrets up to date (`.kamal/secrets`)
+- Secret references in `.kamal/secrets` resolve to values
 - Pre-deployment checklist completed
 - Rollback plan documented
 
@@ -39,7 +39,7 @@ You are a deployment and production operations specialist for this Jumpstart Pro
 | Check health | `bin/kamal app details` | <10 sec | All containers "running" |
 | View logs | `bin/kamal app logs -f` | Instant | No errors streaming |
 | Run console | `bin/kamal app exec -i bin/rails console` | <30 sec | Rails console prompt |
-| Diagnose deploy failure | `bin/kamal app logs --tail 200` | <10 sec | Error message identified |
+| Diagnose deploy failure | `bin/kamal app logs --lines 200` | <10 sec | Error message identified |
 
 ## When to use this skill
 
@@ -71,11 +71,11 @@ This is a custom fork of Jumpstart Pro using **Docker/Make-first development**. 
 Jumpstart Pro requires **four separate PostgreSQL connections**. All four must be configured before deployment:
 
 ```bash
-# .kamal/secrets
-DATABASE_URL=postgresql://...           # Primary application data
-QUEUE_DATABASE_URL=postgresql://...     # SolidQueue background jobs
-CACHE_DATABASE_URL=postgresql://...     # SolidCache (Rails.cache)
-CABLE_DATABASE_URL=postgresql://...     # SolidCable (ActionCable/WebSockets)
+# .kamal/secrets holds references, not raw values. Read each value from ENV or a password manager.
+DATABASE_URL=$DATABASE_URL                # Primary application data
+QUEUE_DATABASE_URL=$QUEUE_DATABASE_URL    # SolidQueue background jobs
+CACHE_DATABASE_URL=$CACHE_DATABASE_URL    # SolidCache (Rails.cache)
+CABLE_DATABASE_URL=$CABLE_DATABASE_URL    # SolidCable (ActionCable/WebSockets)
 ```
 
 **Common Pitfall:** Missing or misconfigured alternate database URLs cause silent failures in background jobs, caching, or real-time features. Always verify all four connections post-deploy.
@@ -85,8 +85,9 @@ CABLE_DATABASE_URL=postgresql://...     # SolidCable (ActionCable/WebSockets)
 - `bin/kamal` - Kamal CLI wrapper
 - `Dockerfile` - Production Docker image (root directory)
 - `Dockerfile.dev` - Development Docker image (used locally only)
-- `.kamal/` - Kamal secrets and configuration overrides
-- `.kamal/secrets` - Environment variables (NEVER commit)
+- `bin/docker-entrypoint` - Runs `bin/rails db:prepare` before `./bin/rails server` starts
+- `.kamal/secrets` - Secret references resolved at deploy time. Jumpstart Pro commits this file, so it must never contain raw credentials
+- `.kamal/hooks/` - Sample Kamal hooks (`pre-deploy`, `post-deploy`, and others)
 
 ### Kamal Configuration Template
 ```yaml
@@ -98,9 +99,6 @@ servers:
   web:
     hosts:
       - production.example.com
-    labels:
-      traefik.http.routers.jumpstart.rule: Host(`example.com`)
-      traefik.http.routers.jumpstart.tls: true
 
   workers:
     hosts:
@@ -130,12 +128,10 @@ env:
     - SMTP_USERNAME
     - SMTP_PASSWORD
 
-# Traefik for SSL/TLS
-traefik:
-  options:
-    letsencrypt:
-      email: ops@example.com
-      storage: /letsencrypt/acme.json
+# kamal-proxy routes traffic and provides Let's Encrypt certificates
+proxy:
+  ssl: true
+  host: example.com
 ```
 
 ### Solid Gems Architecture
@@ -171,38 +167,33 @@ bin/kamal registry login
 # 3. Verify Kamal configuration
 bin/kamal config
 
-# 4. Build and push initial image
-docker build -f Dockerfile -t registry.example.com/jumpstart:latest .
-docker push registry.example.com/jumpstart:latest
-
-# 5. Run Kamal setup (installs Docker, Traefik, accessories)
+# 4. Run Kamal setup (installs Docker, builds and pushes the image,
+#    boots accessories and kamal-proxy, then deploys the app)
 bin/kamal setup
 
-# 6. Verify all accessories are healthy
-bin/kamal accessory details
+# 5. Verify all accessories are healthy
+bin/kamal accessory details all
 
-# 7. Verify Traefik is running
-bin/kamal traefik details
+# 6. Verify kamal-proxy is running
+bin/kamal proxy details
 
-# 8. Run database migrations for all four databases
-bin/kamal app exec bin/rails db:migrate
-bin/kamal app exec bin/rails db:migrate:queue
-bin/kamal app exec bin/rails db:migrate:cache
-bin/kamal app exec bin/rails db:migrate:cable
+# 7. Confirm migrations ran. The web container's entrypoint runs
+#    bin/rails db:prepare, which creates or migrates every database.
+bin/kamal app exec bin/rails db:migrate:status
 
-# 9. Create admin user
+# 8. Create admin user
 bin/kamal app exec -i bin/rails console
 # In console:
 # user = User.create!(name: "Admin", email: "admin@example.com", password: "...", password_confirmation: "...", terms_of_service: true)
 # Jumpstart.grant_system_admin! user
 
-# 10. Verify health endpoint
+# 9. Verify health endpoint
 curl -I https://example.com/up
 
-# 11. Check SSL certificate
+# 10. Check SSL certificate
 curl -vI https://example.com 2>&1 | grep -A 10 "SSL certificate"
 
-# 12. Verify all four database connections
+# 11. Verify all four database connections
 bin/kamal app exec bin/rails runner "puts ActiveRecord::Base.connection.execute('SELECT 1')"
 bin/kamal app exec bin/rails runner "puts SolidQueue::Job.count"
 bin/kamal app exec bin/rails runner "puts Rails.cache.write('test', 'ok') && Rails.cache.read('test')"
@@ -226,7 +217,7 @@ bin/kamal app exec bin/rails runner "puts Rails.cache.write('test', 'ok') && Rai
 **Time-constrained? Run these 3 checks:**
 1. `make test-all` - All tests passing (local Docker environment)
 2. `git diff origin/master --name-only | grep db/migrate` - Review migrations
-3. `bin/kamal config | grep -E "DATABASE_URL|RAILS_MASTER_KEY"` - Secrets current
+3. `bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/'` - Every secret resolves to a value (prints names only)
 
 **Thorough validation (before major releases):**
 ```bash
@@ -247,8 +238,9 @@ make verify   # Clean rebuild + all tests + server verification (10-20 min)
 
 ### Deployment Steps
 ```bash
-# 1. Verify prerequisites
-bin/kamal doctor  # Check environment health
+# 1. Verify the configuration loads and every secret resolves
+bin/kamal config
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/'
 
 # 2. Review what will be deployed
 git log origin/master..HEAD --oneline
@@ -282,7 +274,7 @@ bin/kamal app details
 bin/kamal app details
 
 # 2. Check application logs for errors
-bin/kamal app logs --tail 100 | grep -i error
+bin/kamal app logs --lines 100 --grep error --grep-options=-i
 
 # 3. Test health endpoint
 curl -I https://example.com/up
@@ -300,12 +292,12 @@ bin/kamal app exec bin/rails runner "Rails.cache.write('deploy_test', Time.now) 
 # Check ActionCable is accepting connections (monitor WebSocket traffic)
 
 # 8. Verify background workers are running
-bin/kamal app details --role=workers
+bin/kamal app details --roles=workers
 
 # 9. Check for stuck or failed jobs
 bin/kamal app exec bin/rails runner "puts SolidQueue::FailedExecution.count"
 
-# 10. Verify Traefik and SSL
+# 10. Verify SSL
 curl -vI https://example.com 2>&1 | grep "SSL certificate"
 ```
 
@@ -330,8 +322,8 @@ curl -vI https://example.com 2>&1 | grep "SSL certificate"
 # Deploy with custom tag
 bin/kamal deploy --version=v1.2.3
 
-# Deploy with fresh build
-bin/kamal deploy --skip-push
+# Deploy an image that is already in the registry (skips the build and push)
+bin/kamal deploy --skip-push --version=v1.2.3
 
 # Deploy specific revision
 bin/kamal deploy --version=$(git rev-parse --short HEAD)
@@ -339,23 +331,26 @@ bin/kamal deploy --version=$(git rev-parse --short HEAD)
 
 ### Rollback
 ```bash
-# List deployed versions
-bin/kamal app versions
+# List app containers on the servers. Each container name ends with its version.
+bin/kamal app containers
 
-# Rollback to previous version
-bin/kamal rollback [VERSION]
-
-# Emergency rollback to last working
-bin/kamal rollback $(bin/kamal app versions | grep -v latest | head -n1)
+# Roll back to a version whose container is still on the servers
+bin/kamal rollback VERSION
 ```
+
+`rollback` requires a version and only works while the old container still exists. Kamal keeps the last 5 containers by default (`retain_containers` in `deploy.yml`).
 
 ### Server Management
 ```bash
-# SSH into production server
+# Open a shell in a new app container (add --reuse to use the running container)
 bin/kamal app exec -i bash
 
 # Run Rails console in production
 bin/kamal app exec -i bin/rails console
+
+# Jumpstart Pro's deploy.yml defines aliases for the same commands
+bin/kamal shell
+bin/kamal console
 
 # Run database migrations
 bin/kamal app exec bin/rails db:migrate
@@ -367,10 +362,10 @@ bin/kamal app details
 ### Logs and Debugging
 ```bash
 # Stream application logs
-bin/kamal app logs --tail 100 -f
+bin/kamal app logs -f --lines 100
 
-# View accessory logs
-bin/kamal accessory logs database
+# View accessory logs (Jumpstart Pro names its PostgreSQL accessory "db")
+bin/kamal accessory logs db
 
 # Check app health
 bin/kamal app exec bin/rails runner "puts 'OK'"
@@ -380,20 +375,22 @@ bin/kamal app exec bin/rails runner "puts 'OK'"
 
 Plan the migration strategy with the `database-specialist` and `migration-safety` skills.
 
+Kamal does not run migrations and has no `--skip-migrations` option. Jumpstart Pro's `bin/docker-entrypoint` runs `bin/rails db:prepare` whenever a container starts `./bin/rails server`, so every deploy migrates all four databases before the new web container passes its `/up` health check. Worker containers (`bin/jobs`) do not run it. If a migration fails, the new web container never becomes healthy and the deploy fails.
+
 ### Safe Migration Pattern
 ```bash
-# 1. Deploy code without running migrations
-bin/kamal deploy --skip-migrations
+# 1. Deploy. The web container migrates on boot.
+bin/kamal deploy
 
-# 2. Run migrations separately
-bin/kamal app exec bin/rails db:migrate
+# 2. Verify migrations succeeded
+bin/kamal app logs --grep Migrating
+bin/kamal app exec bin/rails db:migrate:status
 
-# 3. Verify migrations succeeded
-bin/kamal app logs --tail 50 | grep "Migrating"
-
-# 4. If issues, rollback migrations
+# 3. If issues, roll back the last migration
 bin/kamal app exec bin/rails db:rollback STEP=1
 ```
+
+Because migrations run before the new code takes traffic while the old code is still serving, every migration must be backward compatible with the currently deployed code.
 
 ### Zero-Downtime Migration Strategy
 For breaking schema changes:
@@ -406,13 +403,14 @@ For breaking schema changes:
 
 ### Managing Secrets
 ```bash
-# Edit production secrets
-# Stored in .kamal/secrets (not committed)
+# Edit secret references (the values come from ENV or a password manager)
 vim .kamal/secrets
 
-# Test secret loading
-bin/kamal config | grep -A 5 env
+# Confirm every secret resolves, printing names only
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/'
 ```
+
+Kamal 2 has no `kamal env push`. Kamal writes each role's environment file to the servers when it boots the app, so run `bin/kamal deploy` (or `bin/kamal app boot` to reuse the current image) after changing a secret.
 
 ### Environment Variables
 Required production environment variables:
@@ -425,24 +423,24 @@ Required production environment variables:
 
 ## SSL/TLS Certificates
 
-Kamal uses Traefik for automatic SSL with Let's Encrypt:
+Kamal 2 uses kamal-proxy, not Traefik. kamal-proxy obtains and renews Let's Encrypt certificates when `ssl: true` and `host` are set:
 
 ```yaml
 # config/deploy.yml
-traefik:
-  options:
-    letsencrypt:
-      email: ops@example.com
-      storage: /letsencrypt/acme.json
+proxy:
+  ssl: true
+  host: example.com
 ```
+
+Let's Encrypt through kamal-proxy works only when the app deploys to one server. The host must resolve to that server, and port 443 must be open for the challenge. With more than one web host, supply a certificate through `proxy.ssl.certificate_pem` and `proxy.ssl.private_key_pem` secrets, or terminate SSL at a load balancer or Cloudflare with `ssl: false`.
 
 ### Certificate Troubleshooting
 ```bash
-# Check Traefik logs
-bin/kamal traefik logs
+# Check kamal-proxy logs
+bin/kamal proxy logs --lines 200
 
-# Renew certificates manually
-bin/kamal traefik reboot
+# Restart kamal-proxy (stops, removes, and starts a new proxy container)
+bin/kamal proxy reboot
 
 # Verify certificate
 curl -vI https://your-domain.com 2>&1 | grep -A 10 "SSL certificate"
@@ -485,15 +483,17 @@ bin/kamal app exec bin/rails runner "Rails.cache.write('test', 'ok')"
 ```
 
 ### Resource Monitoring
+
+`bin/kamal app exec` runs inside a new app container, which has no Docker CLI and sees only the container's view of the host. Run host checks over SSH instead:
 ```bash
 # Container resource usage
-bin/kamal app exec docker stats --no-stream
+ssh user@production.example.com docker stats --no-stream
 
 # Disk usage
-bin/kamal app exec df -h
+ssh user@production.example.com df -h
 
 # Memory usage
-bin/kamal app exec free -h
+ssh user@production.example.com free -h
 ```
 
 ## Troubleshooting Decision Tree
@@ -510,8 +510,8 @@ bin/kamal deploy 2>&1 | tee deploy-error.log
 # Re-login to registry
 bin/kamal registry login
 
-# Verify credentials in .kamal/secrets
-bin/kamal config | grep KAMAL_REGISTRY_PASSWORD
+# Verify the registry password resolves (prints the name only)
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep KAMAL_REGISTRY_PASSWORD
 
 # Test manual push
 docker login registry.example.com
@@ -526,7 +526,7 @@ ssh user@production.example.com
 ls -la ~/.ssh/id_rsa
 
 # Verify server in deploy.yml
-bin/kamal config | grep hosts
+bin/kamal config | grep -A 5 hosts
 ```
 
 **If "image build failed":**
@@ -548,13 +548,13 @@ df -h
 
 **1. Check application logs**
 ```bash
-bin/kamal app logs --tail 200 | grep -i error
+bin/kamal app logs --lines 200 --grep error --grep-options=-i
 ```
 
 **If "can't connect to database":**
 ```bash
-# Verify all four DATABASE_URLs are set
-bin/kamal config | grep -E "DATABASE_URL|QUEUE_DATABASE|CACHE_DATABASE|CABLE_DATABASE"
+# Verify all four DATABASE_URLs are set (prints names only)
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep DATABASE_URL
 
 # Test each connection individually
 bin/kamal app exec bin/rails runner "ActiveRecord::Base.connection.execute('SELECT 1')"
@@ -570,14 +570,14 @@ bin/kamal app exec -i bash
 
 **If "secret_key_base missing" or "credentials error":**
 ```bash
-# Verify RAILS_MASTER_KEY is set
-bin/kamal config | grep RAILS_MASTER_KEY
+# Verify RAILS_MASTER_KEY is set (prints the name only)
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep RAILS_MASTER_KEY
 
 # Verify credentials file matches
 cat config/credentials.yml.enc  # Should not be empty
 
 # Test credentials in console
-bin/kamal app exec bin/rails runner "puts Rails.application.credentials.secret_key_base"
+bin/kamal app exec bin/rails runner "puts Rails.application.credentials.secret_key_base.present?"
 ```
 
 **If "asset files not found":**
@@ -606,36 +606,34 @@ bin/kamal app exec bin/rails db:migrate:status
 
 ### Symptom: SSL/TLS Certificate Issues
 
-**1. Check Traefik logs**
+**1. Check kamal-proxy logs**
 ```bash
-bin/kamal traefik logs | grep -i "acme\|certificate\|tls"
+bin/kamal proxy logs --lines 200 | grep -i -E "acme|certificate|tls"
 ```
 
-**If "ACME challenge failed":**
+**If the ACME challenge failed:**
 ```bash
-# Verify DNS points to correct IP
+# Verify DNS points to the server's IP
 dig example.com
 
-# Check acme.json permissions (must be 600)
-bin/kamal traefik exec ls -la /letsencrypt/acme.json
+# Confirm deploy.yml sets proxy ssl: true and the matching host,
+# and that the app deploys to exactly one web server
+bin/kamal config | grep -A 5 hosts
 
-# Check disk space for ACME storage
-bin/kamal traefik exec df -h
-
-# Force certificate renewal
-bin/kamal traefik reboot
+# Restart kamal-proxy after fixing DNS, firewall, or configuration
+bin/kamal proxy reboot
 ```
 
-**If "certificate expired":**
+**If the certificate expired:**
 ```bash
-# Traefik should auto-renew. Check why it didn't:
-bin/kamal traefik logs | grep -i "renew"
+# kamal-proxy renews automatically. Check why it did not:
+bin/kamal proxy logs --lines 500 | grep -i -E "acme|renew"
 
 # Verify Let's Encrypt rate limits not hit
 # (5 certificates per domain per week)
 
-# Manual renewal
-bin/kamal traefik reboot
+# Restart kamal-proxy
+bin/kamal proxy reboot
 ```
 
 ### Symptom: Background Jobs Not Processing
@@ -643,10 +641,10 @@ bin/kamal traefik reboot
 **1. Check SolidQueue workers**
 ```bash
 # Verify workers are running
-bin/kamal app details --role=workers
+bin/kamal app details --roles=workers
 
 # Check worker logs
-bin/kamal app logs --role=workers -f
+bin/kamal app logs --roles=workers -f
 
 # Check job queue status
 bin/kamal app exec bin/rails runner "puts SolidQueue::Job.count"
@@ -659,13 +657,13 @@ bin/kamal app exec bin/rails runner "puts SolidQueue::FailedExecution.last(10).m
 bin/kamal deploy --roles=workers
 
 # Verify worker command in deploy.yml
-bin/kamal config | grep -A 5 "workers:"
+grep -A 5 "workers:" config/deploy.yml
 ```
 
 **If "QUEUE_DATABASE_URL not set":**
 ```bash
-# Verify queue database URL
-bin/kamal config | grep QUEUE_DATABASE_URL
+# Verify queue database URL resolves (prints the name only)
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep QUEUE_DATABASE_URL
 
 # Test queue database connection
 bin/kamal app exec bin/rails runner "SolidQueue::Job.connection.execute('SELECT 1')"
@@ -676,23 +674,22 @@ bin/kamal app exec bin/rails runner "SolidQueue::Job.connection.execute('SELECT 
 **1. Check container resources**
 ```bash
 # View resource usage
-bin/kamal app exec docker stats --no-stream
+ssh user@production.example.com docker stats --no-stream
 
 # Check memory usage
-bin/kamal app exec free -h
+ssh user@production.example.com free -h
 
 # Check disk space (critical for Solid gems)
-bin/kamal app exec df -h
+ssh user@production.example.com df -h
 ```
 
 **If "disk full":**
 ```bash
-# Clear old Docker images
-bin/kamal app exec docker image prune -a -f
-
-# Clear logs if too large
-bin/kamal app exec truncate -s 0 /path/to/production.log
+# Remove stopped app containers and unused app images beyond retain_containers
+bin/kamal prune all
 ```
+
+Jumpstart Pro logs to STDOUT, so logs live in Docker's container logs rather than a `production.log` file. Cap their size with `logging: options: max-size: 100m` in `deploy.yml`.
 
 **If "database connection pool exhausted":**
 ```bash
@@ -730,8 +727,6 @@ servers:
     hosts:
       - web1.example.com
       - web2.example.com
-    options:
-      network: "private"
 
   workers:
     hosts:
@@ -798,7 +793,7 @@ bin/kamal app logs --hosts=canary.example.com -f
 bin/kamal deploy --hosts=web1.example.com,web2.example.com
 
 # 4. Or rollback canary if issues found
-bin/kamal rollback --hosts=canary.example.com
+bin/kamal rollback VERSION --hosts=canary.example.com
 ```
 
 ### Blue/Green Deployments
@@ -838,8 +833,8 @@ curl https://green.example.com/up
 Put app in maintenance mode during critical updates:
 
 ```bash
-# 1. Enable maintenance mode (serves static page)
-bin/kamal app exec bin/rails maintenance:enable
+# 1. Enable maintenance mode (kamal-proxy serves a maintenance page)
+bin/kamal app maintenance --message "Scheduled maintenance"
 
 # 2. Drain SolidQueue workers
 bin/kamal app exec bin/rails runner "SolidQueue::Job.where(active: true).count"
@@ -848,8 +843,8 @@ bin/kamal app exec bin/rails runner "SolidQueue::Job.where(active: true).count"
 # 3. Perform maintenance (migrations, data fixes, etc.)
 bin/kamal app exec bin/rails db:migrate
 
-# 4. Disable maintenance mode
-bin/kamal app exec bin/rails maintenance:disable
+# 4. Return the app to live mode
+bin/kamal app live
 ```
 
 ### Clearing SolidQueue/SolidCable Before Maintenance
@@ -871,8 +866,8 @@ bin/kamal app exec bin/rails runner "SolidCable::Message.delete_all"
 
 ### Secrets and Environment
 
-❌ **Pitfall:** Forgetting to push new secrets with `kamal env push` after updating `.kamal/secrets`
-✅ **Solution:** Always run `bin/kamal env push` after changing secrets, then redeploy
+❌ **Pitfall:** Changing a secret and expecting running containers to pick it up
+✅ **Solution:** Redeploy with `bin/kamal deploy` (or `bin/kamal app boot`). Kamal 2 writes the environment file when it boots the app and has no `kamal env push`
 
 ❌ **Pitfall:** Stale `RAILS_MASTER_KEY` causing credentials decryption failure
 ✅ **Solution:** Verify `RAILS_MASTER_KEY` matches `config/master.key` exactly
@@ -880,7 +875,7 @@ bin/kamal app exec bin/rails runner "SolidCable::Message.delete_all"
 ❌ **Pitfall:** Missing one of the four required DATABASE_URLs
 ✅ **Solution:** Always verify all four URLs in pre-deploy checklist:
 ```bash
-bin/kamal config | grep -E "^DATABASE_URL=|^QUEUE_DATABASE_URL=|^CACHE_DATABASE_URL=|^CABLE_DATABASE_URL="
+bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep DATABASE_URL
 ```
 
 ### SolidQueue Workers
@@ -899,24 +894,18 @@ bin/kamal deploy --roles=web,workers
 
 ### SSL/TLS Certificates
 
-❌ **Pitfall:** `acme.json` permissions drift (must be 600) blocking Let's Encrypt renewals
-✅ **Solution:** Check permissions in post-deploy verification:
-```bash
-bin/kamal traefik exec ls -la /letsencrypt/acme.json
-```
+❌ **Pitfall:** Adding a second web host while relying on kamal-proxy's Let's Encrypt certificates
+✅ **Solution:** Automatic certificates work only with one server. Before scaling out, supply a certificate with `proxy.ssl.certificate_pem` and `proxy.ssl.private_key_pem`, or terminate SSL at a load balancer
 
 ❌ **Pitfall:** Hitting Let's Encrypt rate limits (5 certs/domain/week) during testing
 ✅ **Solution:** Use Let's Encrypt staging environment for testing, production for final deploy
-
-❌ **Pitfall:** Insufficient disk space preventing ACME certificate storage
-✅ **Solution:** Monitor disk usage, especially `/letsencrypt` volume
 
 ### Infrastructure
 
 ❌ **Pitfall:** Ignoring disk and inode usage on long-lived hosts
 ✅ **Solution:** Regular cleanup of old Docker images:
 ```bash
-bin/kamal app exec docker system prune -a -f --volumes
+bin/kamal prune all
 ```
 
 ❌ **Pitfall:** Not testing ActionCable/SolidCache endpoints post-deploy
@@ -1006,7 +995,7 @@ Render automatically provisions all required databases and services.
 11. **Keep secrets secure** - Never commit `.kamal/secrets` to version control
 12. **Deploy both web and workers** - When code affects background jobs, deploy both roles
 13. **Check SolidQueue health** - Verify background jobs processing after every deploy
-14. **Verify SSL certificates** - Ensure Traefik auto-renewal working and `acme.json` permissions correct
+14. **Verify SSL certificates** - Check the certificate expiry date and `bin/kamal proxy logs` for renewal errors
 15. **Monitor disk space** - Solid gems and Docker images consume disk; clean regularly
 16. **Deploy during business hours** - Tuesday-Thursday preferred, avoid Friday deployments
 
