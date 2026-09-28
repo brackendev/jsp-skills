@@ -163,7 +163,7 @@ StandardError: An error has occurred, all later migrations canceled
 **Fix:**
 ```bash
 # Check migration status
-make exec ARGS="bin/rails db:migrate:status"
+make rails db:migrate:status
 
 # If corrupted, reset (WARNING: destroys data)
 make clean
@@ -180,7 +180,7 @@ ActiveRecord::RecordInvalid: Validation failed
 **Fix:**
 ```bash
 # Reset database and re-seed
-make rails ARGS="db:reset"
+make rails db:reset
 
 # Or test seeds specifically
 make test-seeds
@@ -359,7 +359,7 @@ make ps
 **3. Check environment:**
 ```bash
 cat .env
-make exec ARGS="env | grep -E '(RAILS|DATABASE|REDIS|SSL)'"
+make exec env | grep -E '(RAILS|DATABASE|REDIS|SSL)'
 ```
 
 **4. Offer the full rebuild (confirm first, since it deletes local data):**

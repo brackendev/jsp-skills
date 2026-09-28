@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-09-28
+
+### Fixed
+
+- The `migration-safety`, `deploy-check`, and `troubleshooting` skills passed arguments to `make rails` and `make exec` through `ARGS="..."`. Those targets read their arguments from the command-line goals and ignore `ARGS`, so the commands stopped with "Error: Arguments required." The skills now use the goal form (`make rails db:rollback`, `make exec bundle audit`), which the other skills already used. `make logs` and `make build` still take `ARGS`.
+
 ## [0.1.18] - 2026-09-26
 
 ### Changed

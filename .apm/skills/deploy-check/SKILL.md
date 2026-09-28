@@ -23,7 +23,7 @@ Time: ~15-20 minutes. If fails, DO NOT deploy.
 ## Step 2: Review Migrations
 
 ```bash
-make exec ARGS="bin/rails db:migrate:status"
+make rails db:migrate:status
 ls -la db/migrate/
 ```
 
@@ -31,7 +31,7 @@ Safety review:
 - [ ] Zero-downtime patterns
 - [ ] Indexes created before foreign keys
 - [ ] Data migrations use batches (<1000 rows per batch)
-- [ ] Tested rollback: `make rails ARGS="db:rollback"`
+- [ ] Tested rollback: `make rails db:rollback`
 
 ## Step 3: Verify Production Credentials
 
@@ -45,8 +45,8 @@ Required: `secret_key_base`, payment processor keys, email API keys, OAuth crede
 ## Step 4: Check Dependencies
 
 ```bash
-make exec ARGS="bundle outdated"
-make exec ARGS="bundle audit"
+make exec bundle outdated
+make exec bundle audit
 ```
 
 ## Step 5: Prepare Rollback Plan

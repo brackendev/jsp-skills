@@ -65,7 +65,7 @@ These prevent data loss and downtime. Treat them as hard requirements, not sugge
 - [ ] Account reference added (indexed, `null: false`, foreign key) for every tenant table
 - [ ] Breaking changes staged (no `NOT NULL` without default or backfill; no immediate column drop)
 - [ ] Indexes added concurrently on large tables; foreign keys indexed
-- [ ] Rollback tested with `make rails ARGS="db:rollback"`
+- [ ] Rollback tested with `make rails db:rollback`
 - [ ] Data migrations batched, idempotent, and account-scoped with `Current.set(account:)`
 - [ ] Suite passes: `make test-all`
 
