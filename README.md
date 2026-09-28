@@ -100,6 +100,8 @@ Automatic activation depends on the model. In Claude Code, Opus 5.5 activated ea
 
 Also auto-triggered. Specialists carry the deeper Jumpstart Pro patterns for each area and coordinate with each other (for example, `hotwire-specialist` defers database queries to `database-specialist` and account scoping to `multi-tenancy-specialist`). They focus on Jumpstart Pro specifics and defer general Rails technique to a companion package such as [37signals-skills](https://github.com/marckohlbrugge/37signals-skills).
 
+In an interactive Claude Code session, the specialists do not appear in the `/` menu, and Opus 5.5 activated each one on a matching request. They have not been tested with smaller models, where the same model dependence described above is likely.
+
 | Skill | Activates on |
 |-------|--------------|
 | `api-specialist` | Jumpstart Pro API endpoints, ApiToken authentication, account scoping, Hotwire Native sessions, the ApplicationClient pattern, non-payment webhooks |

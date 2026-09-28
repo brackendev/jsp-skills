@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.39] - 2026-09-28
+
+### Changed
+
+- The README now states that, in an interactive Claude Code session, the seven `*-specialist` skills do not appear in the `/` menu and that Opus 5.5 activated each one on a matching request. It notes that the specialists have not been tested with smaller models.
+
 ## [0.1.38] - 2026-09-28
 
 ### Added
