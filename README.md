@@ -46,7 +46,7 @@ Run pre-deployment checks before a production release:
 /deploy-check
 ```
 
-The remaining skills (account scoping, migration safety, billing, Hotwire, and the rest) activate automatically when their domain comes up. They cannot be invoked directly.
+The remaining skills (account scoping, migration safety, billing, Hotwire, and the rest) activate automatically when their domain comes up. Claude Code, GitHub Copilot, and Grok Build do not offer them as `/` commands. Other runtimes still let a user invoke them by name, as described under [Auto-triggered](#auto-triggered).
 
 ## Command guide
 
@@ -86,7 +86,7 @@ Pre-deployment readiness checklist for a production release. It runs `make verif
 
 ### Auto-triggered
 
-These activate from conversation context. They cannot be invoked directly.
+These activate from conversation context. Each sets `user-invocable: false`, which Claude Code, GitHub Copilot (VS Code and the Copilot CLI), and Grok Build honor by leaving the skill out of their `/` commands. Codex, OpenCode, and Gemini CLI ignore the field and list these skills with the others, so a user can still invoke them directly. Cursor, Windsurf, and Kiro do not document the field, and their documentation describes direct invocation for every skill.
 
 | Skill | Triggers |
 |-------|----------|

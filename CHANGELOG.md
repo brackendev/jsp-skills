@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.40] - 2026-09-28
+
+### Changed
+
+- The README no longer says the auto-triggered skills and specialists cannot be invoked directly. They set `user-invocable: false`, which Claude Code, GitHub Copilot, and Grok Build honor by leaving them out of their `/` commands. Codex, OpenCode, and Gemini CLI ignore the field, and Cursor, Windsurf, and Kiro do not document it, so users of those runtimes can still invoke the skills by name.
+
 ## [0.1.39] - 2026-09-28
 
 ### Changed
