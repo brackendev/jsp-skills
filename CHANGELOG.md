@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.33] - 2026-09-28
+
+### Changed
+
+- The `billing-specialist`, `deployment-specialist`, and `multi-tenancy-specialist` skills no longer end with Best Practices lists, and their Common Pitfalls sections list only failure modes the rest of the skill does not cover. The removed entries repeated guidance from the skill bodies, and some contradicted it.
+
+### Fixed
+
+- The `billing-specialist` pitfalls told users to set `Current.account` and wrap billing jobs in `ActsAsTenant.with_tenant` before billing operations, although the skill explains that Pay models are not tenant-scoped and that neither setting changes what `account.payment_processor` returns. The remaining pitfall explains that Pay's `ends_at`, `canceled?`, and `on_grace_period?` describe a canceled subscription, not a failed payment.
+- The `deployment-specialist` pitfalls said `RAILS_MASTER_KEY` must match `config/master.key`. Jumpstart Pro's `.kamal/secrets` reads it from `config/credentials/production.key`. The connection pool pitfall now follows Solid Queue's recommendation that worker `threads` stay at or below the queue pool size minus 2, and it explains that Jumpstart Pro sets the pool from `RAILS_MAX_THREADS`.
+
 ## [0.1.32] - 2026-09-28
 
 ### Changed

@@ -864,77 +864,14 @@ bin/kamal app exec bin/rails runner "SolidCable::Message.delete_all"
 
 ## Common Deployment Pitfalls
 
-### Secrets and Environment
+❌ **Pitfall:** Setting `RAILS_MASTER_KEY` from `config/master.key`
+✅ **Solution:** Jumpstart Pro's `.kamal/secrets` reads `RAILS_MASTER_KEY` from `config/credentials/production.key`, the key for `config/credentials/production.yml.enc`. A key from another file cannot decrypt the production credentials.
 
-❌ **Pitfall:** Changing a secret and expecting running containers to pick it up
-✅ **Solution:** Redeploy with `bin/kamal deploy` (or `bin/kamal app boot`). Kamal 2 writes the environment file when it boots the app and has no `kamal env push`
+❌ **Pitfall:** Deploying only the web role after changing job code
+✅ **Solution:** Run `bin/kamal deploy` without `--roles`, which deploys every role, so the workers run the same code as the web servers.
 
-❌ **Pitfall:** Stale `RAILS_MASTER_KEY` causing credentials decryption failure
-✅ **Solution:** Verify `RAILS_MASTER_KEY` matches `config/master.key` exactly
-
-❌ **Pitfall:** Missing one of the four required DATABASE_URLs
-✅ **Solution:** Always verify all four URLs in pre-deploy checklist:
-```bash
-bin/kamal secrets print | sed -E 's/=(.+)$/: set/; s/=$/: empty/' | grep DATABASE_URL
-```
-
-### SolidQueue Workers
-
-❌ **Pitfall:** Running migrations on SolidQueue tables without pausing workers
-✅ **Solution:** Coordinate with **database-specialist**, pause workers, run migration, resume workers
-
-❌ **Pitfall:** Deploying only web role when worker code changed
-✅ **Solution:** Deploy both roles or use `bin/kamal deploy` (all roles):
-```bash
-bin/kamal deploy --roles=web,workers
-```
-
-❌ **Pitfall:** Queue database connection pool too small for worker concurrency
-✅ **Solution:** Set `QUEUE_DATABASE_URL` pool size ≥ worker concurrency level
-
-### SSL/TLS Certificates
-
-❌ **Pitfall:** Adding a second web host while relying on kamal-proxy's Let's Encrypt certificates
-✅ **Solution:** Automatic certificates work only with one server. Before scaling out, supply a certificate with `proxy.ssl.certificate_pem` and `proxy.ssl.private_key_pem`, or terminate SSL at a load balancer
-
-❌ **Pitfall:** Hitting Let's Encrypt rate limits (5 certs/domain/week) during testing
-✅ **Solution:** Use Let's Encrypt staging environment for testing, production for final deploy
-
-### Infrastructure
-
-❌ **Pitfall:** Ignoring disk and inode usage on long-lived hosts
-✅ **Solution:** Regular cleanup of old Docker images:
-```bash
-bin/kamal prune all
-```
-
-❌ **Pitfall:** Not testing ActionCable/SolidCache endpoints post-deploy
-✅ **Solution:** Add to post-deploy verification checklist (see above)
-
-❌ **Pitfall:** Deploying Friday afternoon without on-call coverage
-✅ **Solution:** Deploy during business hours Tuesday-Thursday when team available
-
-### Database Migrations
-
-❌ **Pitfall:** Running breaking schema changes without backward-compatible code first
-✅ **Solution:** Use zero-downtime migration strategy (see below)
-
-❌ **Pitfall:** Forgetting to run migrations on all four databases
-✅ **Solution:** Use dedicated migration commands for each:
-```bash
-bin/kamal app exec bin/rails db:migrate        # PRIMARY
-bin/kamal app exec bin/rails db:migrate:queue  # QUEUE
-bin/kamal app exec bin/rails db:migrate:cache  # CACHE
-bin/kamal app exec bin/rails db:migrate:cable  # CABLE
-```
-
-### Monitoring
-
-❌ **Pitfall:** Not monitoring after deployment ("deploy and forget")
-✅ **Solution:** Monitor logs and metrics for 30 minutes minimum after every deploy
-
-❌ **Pitfall:** Missing silent failures in background jobs or WebSocket connections
-✅ **Solution:** Check `SolidQueue::FailedExecution.count` and ActionCable connection counts
+❌ **Pitfall:** Raising worker `threads` in `config/queue.yml` without raising the connection pool
+✅ **Solution:** Solid Queue recommends `threads` no greater than the queue database's pool size minus 2, because each worker also holds connections for polling and heartbeats. Jumpstart Pro sets every database's pool from `RAILS_MAX_THREADS` (default 5) and each worker's `threads` to 3. Raise `RAILS_MAX_THREADS` with `threads`, and note that it also sets the Puma thread count.
 
 ## Alternative Deployment Platforms
 
@@ -979,25 +916,6 @@ https://dashboard.render.com/blueprint/new?repo=https://github.com/your-username
 Render automatically provisions all required databases and services.
 
 **Handoff:** For Render-specific issues, coordinate with platform-specific expertise.
-
-## Deployment Best Practices
-
-1. **Verify all four database connections** - `DATABASE_URL`, `QUEUE_DATABASE_URL`, `CACHE_DATABASE_URL`, `CABLE_DATABASE_URL` must all be set and accessible
-2. **Always test before deploying** - Run `make test-all` (or `make verify` for major releases)
-3. **Run linters** - Execute `make lint` to catch style/quality issues before deploy
-4. **Use version tags** - `bin/kamal deploy --version=v1.2.3` makes rollbacks easier
-5. **Monitor after deploy** - Watch logs and metrics for 30 minutes minimum
-6. **Deploy incrementally** - Small, frequent deploys reduce risk and blast radius
-7. **Coordinate migrations** - Work with **database-specialist** for all four databases
-8. **Have rollback plan ready** - Know exact rollback command before deploying
-9. **Test in staging first** - Mirror production environment and data
-10. **Communicate deploys** - Notify team before, during, and after
-11. **Keep secrets secure** - Never commit `.kamal/secrets` to version control
-12. **Deploy both web and workers** - When code affects background jobs, deploy both roles
-13. **Check SolidQueue health** - Verify background jobs processing after every deploy
-14. **Verify SSL certificates** - Check the certificate expiry date and `bin/kamal proxy logs` for renewal errors
-15. **Monitor disk space** - Solid gems and Docker images consume disk; clean regularly
-16. **Deploy during business hours** - Tuesday-Thursday preferred, avoid Friday deployments
 
 ## Jumpstart Pro deployment differences
 

@@ -1152,52 +1152,6 @@ project_one:
   account: one  # References accounts(:one)
 ```
 
-### Architecture & Multi-tenancy
-- ❌ Creating models without inheriting from AccountRecord
-- ❌ Using `current_account` in models (use `Current.account` instead)
-- ❌ Forgetting `acts_as_tenant` already scopes queries (don't add redundant `where(account:)`)
-- ✅ Always inherit from AccountRecord for tenant-scoped models
-- ✅ Use `Current.account` in models, `current_account` in controllers/views
-
-### Authorization & Security
-- ❌ Bypassing Pundit authorization checks
-- ❌ Accessing Active Storage blobs directly without parent record validation
-- ✅ Apply Pundit policies consistently
-- ✅ Always validate file access through parent AccountRecord
-
-### Background Jobs & Async Operations
-- ❌ Relying on `Current.account` in a job without setting it
-- ❌ Relying on the tenant captured at enqueue time, which is absent for jobs enqueued from the console, rake tasks, or schedules
-- ✅ Pass the account as an argument and set the tenant with `ActsAsTenant.with_tenant(account)`
-- ✅ Set `Current.account` with `Current.set` when code called from the job reads it
-- ✅ Declare callbacks that read the account after the `around_perform` that sets it
-
-### Development Workflow
-- ❌ Running console without `ActsAsTenant.current_tenant` set
-- ❌ Creating rake tasks without account iteration
-- ❌ Missing account context in seeds
-- ✅ Use console helpers to set account context
-- ✅ Iterate through accounts in rake tasks
-- ✅ Wrap seed data in `ActsAsTenant.with_tenant`
-
-## Best Practices
-
-### Architecture & Data Access
-1. **Always scope to current_account** for multi-tenant data
-2. **Use AccountRecord** as base class for account-scoped models
-3. **Use Current.account in models**, `current_account` helper in controllers/views
-4. **Follow concern patterns** for model organization (Billing, Transfer, etc.)
-
-### Authorization
-5. **Apply Pundit policies** for all authorization checks
-6. **Define policy scopes** to automatically filter data by account
-7. **Use policy helpers** like `account_admin?` and `account_member?`
-
-### Testing
-8. **Test with fixtures** following Jumpstart patterns in `test/fixtures/`
-9. **Use system tests** for Hotwire/Turbo interactions
-10. **Test multi-tenancy** by switching accounts in tests
-
 ## Testing Multi-Tenancy
 
 ### Fixtures and Seeds

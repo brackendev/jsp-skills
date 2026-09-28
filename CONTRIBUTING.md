@@ -62,3 +62,5 @@ For the argument grammar, scope vocabulary, and mutation defaults that every use
 | `user-invocable: false` | Model-invoked from conversation context (for example `migration-safety` and every `*-specialist` skill). Omitting the field also makes the skill user-invocable. |
 
 Every skill carries `agents/openai.yaml` whose `policy.allow_implicit_invocation` matches the table above (`true` for model-invoked, `false` for user-only).
+
+Record known failure modes in a `## Common Pitfalls` section. List only failure modes that the rest of the skill does not already cover. Do not restate body guidance as pitfalls, and do not add a separate Best Practices list.
