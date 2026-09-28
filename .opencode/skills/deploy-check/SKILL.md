@@ -35,12 +35,21 @@ Safety review:
 
 ## Step 3: Verify Production Credentials
 
+Do not run `bin/rails credentials:show` on its own. It prints every production secret into the terminal and the session transcript. Pipe it through a filter that prints only the key names and whether each value is set:
+
 ```bash
 make shell
-EDITOR="vim" bin/rails credentials:show --environment production
+bin/rails credentials:show --environment production | ruby -ryaml -e '
+  data = YAML.safe_load($stdin.read, aliases: true)
+  abort "Could not read the production credentials." unless data.is_a?(Hash)
+  print_keys = lambda do |node, path|
+    return puts("#{path.join(".")}: #{node.to_s.empty? ? "EMPTY" : "set"}") unless node.is_a?(Hash)
+    node.each { |key, value| print_keys.call(value, path + [key]) }
+  end
+  print_keys.call(data, [])'
 ```
 
-Required: `secret_key_base`, payment processor keys, email API keys, OAuth credentials
+Required: `secret_key_base`, payment processor keys, email API keys, OAuth credentials (`omniauth.<provider>.public_key` and `private_key`). Any required key reported as `EMPTY` or absent is a stop condition. The filter aborts when the output is not credentials YAML, which usually means `config/credentials/production.key` is missing.
 
 ## Step 4: Check Dependencies
 

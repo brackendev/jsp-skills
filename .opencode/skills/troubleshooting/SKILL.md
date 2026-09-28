@@ -24,7 +24,7 @@ If the report does not make the problem area clear, ask the user whether it invo
 | Can't connect to database | `make logs ARGS="postgres"` → wait for "ready to accept connections" | [Database](#database-issues) |
 | Tests failing | `make clean && make setup && make test-all` | [Tests](#test-issues) |
 | Port already in use | `lsof -i :3001` → `kill -9 <PID>` | [Ports](#port-issues) |
-| Permission denied | `chmod -R 777 log tmp` | [Permissions](#permission-issues) |
+| Permission denied | Compare `id` with `make exec id`, then match UID and GID in .env or `chown` | [Permissions](#permission-issues) |
 
 ## Full rebuild
 
@@ -272,11 +272,35 @@ Permission denied: '/app/log/development.log'
 Permission denied @ dir_s_mkdir - /app/tmp
 ```
 
-**Fix:**
+The container user cannot write to directories owned by a different user. Compare the owners with the host and container users:
+
 ```bash
-chmod -R 777 log tmp app/assets/builds db
+ls -ld log tmp app/assets/builds
+id
+make exec id
+```
+
+**Fix:**
+
+If the container UID or GID differs from the host, set the host IDs in `.env` and rebuild. The development image creates its user from the `UID` and `GID` build arguments in `compose.yaml` (default 1000):
+
+```bash
+# In .env, using the values from `id -u` and `id -g`
+UID=501
+GID=20
+
+make build
 make restart
 ```
+
+If the IDs match but the directories are owned by another user such as root, restore ownership on the host:
+
+```bash
+sudo chown -R "$(id -u):$(id -g)" log tmp app/assets/builds
+make restart
+```
+
+Do not use `chmod -R 777`. It makes every file world-writable and executable, and it gives any process write access to the schema and migrations if applied to `db`.
 
 ---
 

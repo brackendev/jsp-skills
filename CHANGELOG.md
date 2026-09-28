@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.28] - 2026-09-28
+
+### Fixed
+
+- The `deploy-check` credentials step ran `bin/rails credentials:show --environment production`, which printed every production secret into the terminal and the session transcript. The step now pipes the output through a filter that prints only each key name and whether its value is set.
+- The `troubleshooting` fix for permission errors ran `chmod -R 777` on `log`, `tmp`, `app/assets/builds`, and `db`, making them world-writable. It now compares the host and container users, then either sets matching `UID` and `GID` values in `.env` and rebuilds, or restores ownership with `chown`.
+
 ## [0.1.27] - 2026-09-28
 
 ### Fixed
