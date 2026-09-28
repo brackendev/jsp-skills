@@ -57,7 +57,7 @@ Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsA
 ### Authorization
 
 - Every controller action calls Pundit `authorize` or `policy_scope`; owner-only features (billing, account deletion, owner transfer) check `current_account.owner?(current_user)`.
-- Policies authorize on account membership and role (`account_member?`, `account_admin?`, `account_owner?`), not merely `user.present?`. Policy scopes return `scope.all` and let `acts_as_tenant` apply the account filter.
+- Policies receive `Current.account_user` (Jumpstart Pro's `pundit_user`) and authorize on its role, such as `account_user.admin?`. `ApplicationPolicy` and its `Scope` raise `Pundit::NotAuthorizedError` when the account user is nil, which rejects guests and signed-in non-members, so that check stays in place. Policy scopes return `scope.all` and let `acts_as_tenant` apply the account filter.
 - View conditionals use `policy(record).action?`; shared collections render through `policy_scope`.
 
 ### Account switching and impersonation
@@ -100,7 +100,7 @@ Look first at these, ordered by how often they appear and how much they cost:
 3. Cache keys without `account_id` (cross-account cache leaks).
 4. API controllers skipping account-membership checks (cross-account API access).
 5. Billing controllers without an impersonation guard that compares `current_user` with `true_user` (support staff manipulating subscriptions).
-6. Pundit policies checking `user.present?` instead of account membership.
+6. Pundit policies with `ApplicationPolicy`'s nil `account_user` check commented out (guests and non-members reach any action that returns `true`).
 7. Custom webhook controllers without signature verification (use Pay's controllers for payments).
 8. Accepting price amounts from the client (price tampering).
 9. Account switching via `Account.find(params[:id])` instead of `current_user.accounts.find`.

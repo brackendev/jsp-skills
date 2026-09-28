@@ -162,7 +162,7 @@ The last before_action calls `set_current_tenant(Current.account)`, so `ActsAsTe
 Document.all  # SELECT * FROM documents WHERE account_id = ?
 ```
 
-**Membership is not checked for every source.** The cookie and fallback lookups go through `current_user.accounts`. The path, domain, and subdomain lookups use `Account.find_by` and do not check that the signed-in user belongs to the account. For a non-member, `Current.account_user` is nil, so `Current.account_admin?` is false and Pundit receives a nil `pundit_user`. Controllers that serve account data under path or subdomain tenancy must check membership (for example, `Current.account_user.present?`) or rely on a policy that rejects a nil account user.
+**Membership is not checked for every source.** The cookie and fallback lookups go through `current_user.accounts`. The path, domain, and subdomain lookups use `Account.find_by` and do not check that the signed-in user belongs to the account. For a non-member, `Current.account_user` is nil, so `Current.account_admin?` is false and Pundit receives a nil `pundit_user`. Jumpstart Pro's `ApplicationPolicy` raises `Pundit::NotAuthorizedError` for a nil account user, so an action that calls `authorize` or `policy_scope` rejects non-members. Controllers that serve account data under path or subdomain tenancy must call one of them or check membership directly (for example, `Current.account_user.present?`).
 
 **API controllers**
 
@@ -491,7 +491,93 @@ end
 
 ## Authorization (Pundit)
 
-All authorization through Pundit policies. Jumpstart Pro combines Pundit with `acts_as_tenant` for automatic scoping.
+Jumpstart Pro combines Pundit with `acts_as_tenant`: policies decide what the current account user may do, and `acts_as_tenant` limits queries to the current account.
+
+### Jumpstart Pro Setup
+
+The `Authorization` concern (included in `ApplicationController` and `Api::BaseController`) includes `Pundit::Authorization` and overrides `pundit_user`:
+
+```ruby
+# Use AccountUser since it determines the roles for the current Account
+def pundit_user
+  Current.account_user
+end
+```
+
+Policies therefore receive the `AccountUser` for the current account, not the `User`. The concern ships `after_action :verify_authorized` and `rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized` commented out. Until the application uncomments them, a controller that never calls `authorize` raises nothing, and a denied `authorize` raises an unrescued `Pundit::NotAuthorizedError`. Pundit registers no rescue response for that error, so production renders the 500 error page. The `user_not_authorized` handler redirects back with the `unauthorized` flash message.
+
+Jumpstart Pro's base policy (`lib/jumpstart/app/policies/application_policy.rb`, also the template for `rails generate pundit:install`):
+
+```ruby
+class ApplicationPolicy
+  # Defaults:
+  # - Allow admins
+  # - Deny everyone else
+
+  attr_reader :account_user, :record
+
+  def initialize(account_user, record)
+    # Comment out to allow guest users
+    raise Pundit::NotAuthorizedError, "must be logged in" unless account_user
+
+    @account_user = account_user
+    @record = record
+  end
+
+  def index?
+    account_user.admin?
+  end
+
+  def show?
+    account_user.admin?
+  end
+
+  def create?
+    account_user.admin?
+  end
+
+  def new?
+    create?
+  end
+
+  def update?
+    account_user.admin?
+  end
+
+  def edit?
+    update?
+  end
+
+  def destroy?
+    account_user.admin?
+  end
+
+  class Scope
+    def initialize(account_user, scope)
+      # Comment out to allow guest users
+      raise Pundit::NotAuthorizedError, "must be logged in" unless account_user
+
+      @account_user = account_user
+      @scope = scope
+    end
+
+    def resolve
+      scope.all
+    end
+
+    private
+
+    attr_reader :account_user, :scope
+  end
+end
+```
+
+Two consequences follow:
+
+- **The nil check is the membership check.** `Current.account_user` is nil for a guest and for a signed-in user who is not a member of `Current.account` (possible under path, domain, or subdomain tenancy). Every `authorize` and `policy_scope` call rejects them before any action method runs, so `true` in a policy means "any member of the current account". Commenting out the check admits guests and non-members.
+- **Every action defaults to admin-only.** A policy that does not override an action allows only `account_user.admin?`. Override an action to open it to members.
+
+The base policy exposes only `account_user` and `record`. It has no `user` or `account` reader and no `account_member?` or `account_admin?` helper, so policies copied from other Pundit setups fail with `NoMethodError`. Use `account_user.user`, `account_user.account`, `account_user.admin?`, and `account_user.account_owner?` (defined on `AccountUser`). The owner is always an admin, so `account_user.admin?` covers the owner.
 
 ### Policy Structure
 
@@ -499,96 +585,57 @@ All authorization through Pundit policies. Jumpstart Pro combines Pundit with `a
 # app/policies/document_policy.rb
 class DocumentPolicy < ApplicationPolicy
   def index?
-    true  # All account members can view
+    true  # Any member of the current account
+  end
+
+  def show?
+    true
   end
 
   def create?
-    account_member?  # Must be account member
+    true
   end
 
   def update?
-    account_admin? || record.user_id == user.id  # Admin or owner
+    account_user.admin? || record.user_id == account_user.user_id  # Admin or author
   end
 
-  def destroy?
-    account_admin?  # Only admins can delete
-  end
+  # destroy? is inherited: admins only
 
-  class Scope < ApplicationPolicy::Scope
+  class Scope < Scope
     def resolve
       # acts_as_tenant already scopes to Current.account
-      # Just return the scope - no manual where(account:) needed!
-      scope.all
-    end
-  end
-end
-
-# app/policies/application_policy.rb (Jumpstart Pro base)
-class ApplicationPolicy
-  attr_reader :user, :record, :account, :account_user
-
-  def initialize(user, record)
-    @user = user
-    @record = record
-    @account = Current.account
-    @account_user = Current.account_user
-  end
-
-  # Helper methods available in all policies
-  def account_member?
-    account_user.present?
-  end
-
-  def account_admin?
-    account_user&.admin? || account_user&.owner?
-  end
-
-  def account_owner?
-    account&.owner_id == user&.id
-  end
-
-  class Scope
-    attr_reader :user, :scope, :account, :account_user
-
-    def initialize(user, scope)
-      @user = user
-      @scope = scope
-      @account = Current.account
-      @account_user = Current.account_user
-    end
-
-    def resolve
-      # Default: Return all records
-      # acts_as_tenant handles account scoping automatically
       scope.all
     end
   end
 end
 ```
 
+`rails generate pundit:policy Document` uses Jumpstart Pro's template, whose commented examples call `account_user.member?`. That method exists only after `:member` is added to `AccountUser::ROLES` (see Owner and Roles). Replace those calls or add the role before uncommenting them.
+
 Because `acts_as_tenant` scopes AccountRecord models, policy scopes typically return `scope.all`. The scoping happens at the model layer, not the policy layer.
 
 ```ruby
 # ❌ REDUNDANT: acts_as_tenant already does this
-class Scope < ApplicationPolicy::Scope
+class Scope < Scope
   def resolve
-    scope.where(account: account)  # Unnecessary!
+    scope.where(account: account_user.account)  # Unnecessary!
   end
 end
 
 # ✅ CORRECT: Let acts_as_tenant handle account scoping
-class Scope < ApplicationPolicy::Scope
+class Scope < Scope
   def resolve
     scope.all  # Already scoped by acts_as_tenant
   end
 end
 
 # ✅ WHEN TO ADD FILTERS: Additional authorization beyond tenancy
-class Scope < ApplicationPolicy::Scope
+class Scope < Scope
   def resolve
     # acts_as_tenant scopes to account automatically
     # Add role-based filtering on top
-    if account_admin?
+    if account_user.admin?
       scope.all  # Admins see everything in the account
     else
       scope.where(public: true)  # Members only see public records

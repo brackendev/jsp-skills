@@ -30,7 +30,7 @@ Models that are genuinely global (`User`, `Plan`) are the exception.
 ## New controller
 
 1. Scope every query through `current_account` (`current_account.documents.find(...)`), never `Document.find` or `Document.all`.
-2. Add a Pundit policy and call `authorize` (or `policy_scope`) in each action. See `multi-tenancy-specialist` for the Jumpstart Pro policy and scope patterns (`account_member?`, `account_admin?`, `account_owner?`).
+2. Add a Pundit policy and call `authorize` (or `policy_scope`) in each action. Jumpstart Pro policies receive `Current.account_user` as `account_user` and default every action to `account_user.admin?`. See `multi-tenancy-specialist` for the Jumpstart Pro policy and scope patterns.
 
 ```ruby
 def show

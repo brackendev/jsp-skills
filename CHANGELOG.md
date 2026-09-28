@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.35] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist` Pundit section presented an `ApplicationPolicy` as the Jumpstart Pro base, but that policy took `(user, record)`, read `Current`, and called `account_user&.owner?`, which does not exist. The section now shows Jumpstart Pro's policy, which receives `Current.account_user` through `pundit_user`, rejects a nil account user, and allows only admins by default. It also explains that Jumpstart Pro leaves `verify_authorized` and the `Pundit::NotAuthorizedError` handler disabled, and that the `pundit:policy` generator's commented examples call a `member?` role that Jumpstart Pro does not define.
+- The `security-specialist` and `account-scoping` skills referred to the `account_member?`, `account_admin?`, and `account_owner?` policy helpers from the same example. They now describe policies that authorize on `account_user`, and the security review pattern flags policies whose nil account user check is commented out.
+
 ## [0.1.34] - 2026-09-28
 
 ### Fixed
