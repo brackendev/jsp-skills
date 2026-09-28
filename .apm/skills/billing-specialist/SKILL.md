@@ -988,6 +988,8 @@ end
 
 Apply the same `before_action` to the other controllers that change billing: `Billing::SubscriptionsController`, the controllers under `Billing::Subscriptions::` (cancels, pauses, resumes, payment methods), and `CheckoutsController`. These live under `lib/jumpstart/app/controllers/`. Copy each one to the same path under `app/controllers/`, which takes precedence, and keep the copies in sync during upstream merges.
 
+To also require the user's password before billing changes, add Jumpstart Pro's `before_action :sudo` to the same controllers. It adds to the impersonation guard and does not replace it. multi-tenancy-specialist explains where to place it and why the password prompt appears only on GET actions.
+
 ## Webhook Logging
 
 Log all webhook requests for debugging and audit trails. Pay has no shared base controller for webhooks (each processor's controller inherits from `ActionController::API`), so add the callback to each enabled processor's controller. The controllers only verify and enqueue events, so this logs receipt. Failures inside listeners surface in `Pay::Webhooks::ProcessJob`.

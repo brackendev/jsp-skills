@@ -66,6 +66,7 @@ Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsA
 - Jumpstart Pro does not log account switches. An application that needs an audit trail adds its own log of the user, the previous and new account, and the IP.
 - Jumpstart Pro impersonates users with the `pretender` gem from Madmin (`Madmin::User::ImpersonatesController`). While impersonating, `current_user` and `Current.account_user` are the impersonated user and `true_user` is the admin, so role checks such as `require_current_account_admin` pass whenever the impersonated user holds the role. Jumpstart Pro provides no guard, log, or target restriction.
 - Billing and other destructive actions run an application-level `block_during_impersonation` before_action (the `ImpersonationGuard` concern in multi-tenancy-specialist) that compares `current_user` with `true_user`. The Madmin controller override logs impersonation sessions with start and end timestamps and refuses targets with `admin?`.
+- Jumpstart Pro's `Users::Sudo` concern (`before_action :sudo`) is an optional password confirmation for sensitive actions, not an impersonation guard. An admin's own confirmation stays valid during impersonation unless the Madmin override deletes `session[:sudo]`. On a POST, PATCH, or DELETE action, Turbo does not display the prompt, so check that `sudo` also runs on the GET action that renders the form.
 
 ```ruby
 class Billing::SubscriptionsController < ApplicationController

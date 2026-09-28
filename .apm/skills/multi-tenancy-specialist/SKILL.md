@@ -439,6 +439,28 @@ end
 
 Jumpstart Pro's billing controllers live under `lib/jumpstart/app/controllers/`. To add the `before_action`, copy the controller to the same path under `app/controllers/`, which takes precedence, and keep the copy in sync during upstream merges.
 
+### Password Confirmation with `Users::Sudo`
+
+Jumpstart Pro's `ApplicationController` includes the `Users::Sudo` concern, but no Jumpstart Pro controller calls it. `before_action :sudo` renders a password confirmation page (`users/sudo/new`). A correct password sets `session[:sudo]`, which lets the user through for 30 minutes (`Users::Sudo.sudo_duration`). Add it to billing changes, subscription cancellation, and account deletion to protect against someone using an unattended signed-in session:
+
+```ruby
+# app/controllers/billing/subscriptions/cancels_controller.rb (copied from lib/jumpstart/app/controllers/)
+class Billing::Subscriptions::CancelsController < ApplicationController
+  before_action :authenticate_user!
+  before_action :require_current_account_admin
+  before_action :block_during_impersonation
+  before_action :sudo
+  before_action :set_subscription
+  # ...
+end
+```
+
+Use `sudo` alongside `block_during_impersonation`, not as a replacement for it:
+
+- **Impersonation keeps the confirmation.** `impersonate_user` changes only `session[:impersonated_user_id]`, so an admin who confirmed their own password less than 30 minutes earlier passes every `sudo` check while impersonating. The `Madmin::User::ImpersonatesController` override below deletes `session[:sudo]` when impersonation starts.
+- **The prompt appears only on GET requests.** `sudo` renders the password page with a 200 status. Turbo rejects a 200 response to a POST, PATCH, or DELETE form submission ("Form responses must redirect to another location"), so the action is blocked but the user sees no prompt. Keep `sudo` on the action that renders the form (`edit`, the cancel page's `show`, `payment_methods#new`) so the user confirms before submitting. Keep it on the submitting action too, so a direct request cannot skip the check. If the 30 minutes run out between the two requests, the submission fails silently until the user reloads the form.
+- **OAuth-only users do not know their password.** Jumpstart Pro gives users created through OAuth a random password (`Devise.friendly_token`), so they must use the "Forgot password?" link on the confirmation page first.
+
 ### Logging and Restricting Impersonation
 
 Jumpstart Pro does not log impersonation or restrict its targets. Override `Madmin::User::ImpersonatesController` in `app/controllers/madmin/user/impersonates_controller.rb` to add both:
@@ -459,6 +481,7 @@ class Madmin::User::ImpersonatesController < Madmin::ApplicationController
       started_at: Time.current,
       ip_address: request.remote_ip
     )
+    session.delete(:sudo) # The admin's own password confirmation must not carry into impersonation
     impersonate_user(user)
     redirect_to main_app.root_path, status: :see_other
   end
@@ -484,6 +507,7 @@ end
 ### Safeguards Checklist
 
 - ✅ Include `ImpersonationGuard` and call `block_during_impersonation` in controllers that change billing, credentials, or account ownership
+- ✅ Optionally add `before_action :sudo` to those controllers, and delete `session[:sudo]` when impersonation starts
 - ✅ Log each impersonation session with start and end times and the IP address
 - ✅ Keep `impersonation_banner` in every layout
 - ✅ Refuse to impersonate system admins

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.38] - 2026-09-28
+
+### Added
+
+- The `multi-tenancy-specialist` skill now describes Jumpstart Pro's `Users::Sudo` password confirmation (`before_action :sudo`) as an optional addition to the impersonation guard for billing changes, cancellation, and account deletion. It explains that an admin's own confirmation stays valid during impersonation, adds a `session[:sudo]` reset to the Madmin impersonation override, and says to keep `sudo` on the action that renders the form because Turbo does not display the prompt for a POST, PATCH, or DELETE submission. It also notes that users created through OAuth must reset their password before they can confirm it. The `billing-specialist` and `security-specialist` skills point to this guidance.
+
 ## [0.1.37] - 2026-09-28
 
 ### Fixed
