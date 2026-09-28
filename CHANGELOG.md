@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.21] - 2026-09-28
+
+### Fixed
+
+- The `multi-tenancy-specialist` skill said Jumpstart Pro sets `config.require_tenant = true`, and its console, rake task, API controller, fixture, and model test examples expected `ActsAsTenant::Errors::NoTenantSet`. Jumpstart Pro sets `config.require_tenant = false`, so a query without a tenant returns every account's rows instead of raising. The configuration section and examples now describe that behavior. The model test asserts that an unscoped query returns records from both accounts, and the fixture examples show the `ActiveRecord::NotNullViolation` that a missing `account` reference causes.
+
 ## [0.1.20] - 2026-09-28
 
 ### Fixed

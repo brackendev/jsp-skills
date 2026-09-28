@@ -97,16 +97,16 @@ class CrossTenantReport < ApplicationRecord
 end
 ```
 
-**Configuration (already set by Jumpstart):**
+**Configuration (Jumpstart Pro default):**
 
 ```ruby
 # config/initializers/acts_as_tenant.rb
 ActsAsTenant.configure do |config|
-  config.require_tenant = true  # Raises error if Current.account not set
+  config.require_tenant = false  # No error when no tenant is set
 end
 ```
 
-This means **any query on an AccountRecord subclass without Current.account set will raise `ActsAsTenant::Errors::NoTenantSet`**. This is a critical safety feature that prevents accidental cross-tenant data leaks.
+With this default, a query on an `AccountRecord` subclass without a current tenant does not raise. The `acts_as_tenant` default scope is skipped, so the query returns rows from every account. Code that runs outside a request (console, rake tasks, jobs, tests) must set a tenant with `ActsAsTenant.with_tenant(account)` or query through the account association. Setting `config.require_tenant = true` makes these queries raise `ActsAsTenant::Errors::NoTenantSet` instead, but that is a project decision, not the Jumpstart Pro default.
 
 ### Request Lifecycle: How Current.account Gets Set
 
@@ -980,13 +980,13 @@ end
 
 ### 2. API Controllers Missing Current.account (COMMON ERROR)
 
-**Problem:** API controllers skip `set_current_account` causing `NoTenantSet` errors.
+**Problem:** API controllers skip `set_current_account`, so no tenant is set and `AccountRecord` queries return every account's rows.
 
 ```ruby
 # ❌ WRONG: API controller accessing AccountRecord without context
 class Api::V1::ProjectsController < Api::BaseController
   def index
-    @projects = Project.all  # NoTenantSet error!
+    @projects = Project.all  # No tenant: returns every account's projects
     render json: @projects
   end
 end
@@ -1024,13 +1024,13 @@ end
 
 ### 3. Console Commands Without Account Context (DEVELOPMENT TRAP)
 
-**Problem:** Running queries in console without setting tenant raises errors or corrupts data.
+**Problem:** Console queries without a tenant return or change every account's data, and creates fail validation because no account is assigned.
 
 ```ruby
 # ❌ DANGEROUS: No account context
 make console
-> Project.create!(title: "Test")  # NoTenantSet error!
-> Project.all  # NoTenantSet error!
+> Project.create!(title: "Test")  # ActiveRecord::RecordInvalid: Account must exist
+> Project.all  # Returns every account's projects
 
 # ✅ SAFE: Set account context first
 make console
@@ -1059,7 +1059,7 @@ make console
 # ❌ DANGEROUS: Global operation on all accounts
 namespace :reports do
   task generate: :environment do
-    Project.find_each do |project|  # NoTenantSet error!
+    Project.find_each do |project|  # No tenant: queries inside generate_report are unscoped too
       project.generate_report
     end
   end
@@ -1158,7 +1158,7 @@ end
 
 ### 7. Fixture Data Without Account Associations
 
-**Problem:** Test fixtures missing account references cause NoTenantSet errors.
+**Problem:** Test fixtures missing account references fail to load when `account_id` is `null: false`, or load as records that belong to no account.
 
 ```ruby
 # ❌ BREAKS TESTS: Missing account association
@@ -1167,7 +1167,7 @@ project_one:
   title: "Test Project"
   # Missing account: reference
 
-# Tests fail with NoTenantSet!
+# Fixture loading fails with ActiveRecord::NotNullViolation
 
 # ✅ FIXED: Explicit account association
 # test/fixtures/projects.yml
@@ -1266,7 +1266,7 @@ project_two:
 # ❌ BAD: No account association
 project_orphan:
   title: "Orphan Project"
-  # Missing account: - will cause NoTenantSet errors
+  # Missing account: - fixture loading fails with ActiveRecord::NotNullViolation
 
 # ✅ GOOD: Explicit account
 project_scoped:
@@ -1294,10 +1294,11 @@ class ProjectTest < ActiveSupport::TestCase
     end
   end
 
-  test "should raise error without account context" do
-    assert_raises ActsAsTenant::Errors::NoTenantSet do
-      Project.all.to_a  # Force query execution
-    end
+  test "returns every account's records without account context" do
+    # Jumpstart Pro sets config.require_tenant = false, so nothing raises
+    all_projects = Project.all
+    assert_includes all_projects, projects(:project_one)
+    assert_includes all_projects, projects(:project_two)
   end
 end
 ```
@@ -1429,7 +1430,7 @@ Always wrap console commands with account context:
 ```ruby
 # ❌ DANGEROUS: Global query
 make console
-> Project.all  # NoTenantSet error!
+> Project.all  # Returns every account's projects
 
 # ✅ SAFE: Set account context
 make console
