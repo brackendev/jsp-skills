@@ -502,7 +502,9 @@ module PayChargeExtension
       add_to_marketing_list(order.account.email)
     end
   rescue StandardError => e
-    # Log but don't raise (webhook will retry)
+    # Nothing retries this callback. The charge is already saved, and a later sync
+    # of the same charge updates it without running `on: :create` callbacks again.
+    # Log the failure so someone can fulfill the order by hand.
     Rails.logger.error("Fulfillment failed for charge #{id}: #{e.message}")
     Honeybadger.notify(e) if defined?(Honeybadger)
   end

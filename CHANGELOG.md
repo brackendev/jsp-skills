@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.34] - 2026-09-28
+
+### Fixed
+
+- The `billing-specialist` fulfillment example said a failed `PayChargeExtension` fulfillment would be retried by the webhook. Nothing retries it: the callback rescues the error, Pay's `Pay::Webhooks::ProcessJob` declares no `retry_on`, and a later sync of the same charge updates the existing record without running `after_commit on: :create` again. The comment now says that the failure is only logged and the order needs manual fulfillment.
+
 ## [0.1.33] - 2026-09-28
 
 ### Changed
