@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.1.36] - 2026-09-28
+
+### Fixed
+
+- The `security-specialist` account switching guidance said switching updates the session and logs the user, accounts, and IP. Jumpstart Pro's `PATCH /accounts/:id/switch` writes a signed `account_id` cookie in cookie mode, only redirects in subdomain and path modes, and logs nothing. The guidance now describes each mode, notes that subdomain and path lookups do not check membership and rely on authorization, and presents the switch log as an application addition.
+
 ## [0.1.35] - 2026-09-28
 
 ### Fixed

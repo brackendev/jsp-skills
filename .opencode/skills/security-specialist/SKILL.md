@@ -62,7 +62,8 @@ Tenant-scoped jobs take the account as a `perform` argument, wrap work in `ActsA
 
 ### Account switching and impersonation
 
-- Switching validates membership with `current_user.accounts.find(params[:id])`, updates the session and `Current.account` together, and logs the user, old and new account, and IP.
+- `PATCH /accounts/:id/switch` loads the account with `current_user.accounts.find(params[:id])`, so a user cannot switch to an account they do not belong to. In cookie mode it writes a signed, HTTP-only `account_id` cookie, and the next request resolves that cookie only through `current_user.accounts`, so a stale or foreign ID falls back to the user's default account. In subdomain and path modes the action only redirects, and the next request finds the account by subdomain or path without checking membership. A non-member then has a nil `Current.account_user`, and only authorization rejects them.
+- Jumpstart Pro does not log account switches. An application that needs an audit trail adds its own log of the user, the previous and new account, and the IP.
 - Jumpstart Pro impersonates users with the `pretender` gem from Madmin (`Madmin::User::ImpersonatesController`). While impersonating, `current_user` and `Current.account_user` are the impersonated user and `true_user` is the admin, so role checks such as `require_current_account_admin` pass whenever the impersonated user holds the role. Jumpstart Pro provides no guard, log, or target restriction.
 - Billing and other destructive actions run an application-level `block_during_impersonation` before_action (the `ImpersonationGuard` concern in multi-tenancy-specialist) that compares `current_user` with `true_user`. The Madmin controller override logs impersonation sessions with start and end timestamps and refuses targets with `admin?`.
 
